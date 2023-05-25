@@ -28,7 +28,7 @@
 ;; The default 404 response.
 (defun http-404 (env path-items params)
   '(404 (:content-type "text/plain")
-    ("uh-oh, I did a war crime!")))
+    ("404, you goddamn fool!")))
 
 
 ;; Respond to requests within the /u/* directory.
@@ -42,11 +42,10 @@
 
 ;; Returns the response data for Clack, given the request data `env`.
 (defun server (env)
-  (let* ((path-split-? (str:split #\? (getf env :request-uri)))
-         (path (car path-split-?))
-         (params (cadr path-split-?))
+  (let* ((path (pathname-sans-parameters (getf env :request-uri)))
+         (params (pathname-parameters (getf env :request-uri)))
          (response-function
-           (or (assoc-by-path *directories* (pathname-components path))
+           (or (assoc-by-path (directories) (pathname-components path))
                '("" . http-404)))
          ;; So that response functions only deal with relative paths…
          (path-sans-response-root
@@ -96,6 +95,23 @@
            alist (reverse
                   (cdr (reverse path-items)))
            (+ depth 1))))))
+
+
+;; Removes parameters from a URI pathname, returning the bare path.
+;; "/path/a/b?a=1&b=3" → "/path/a/b"
+(defun pathname-sans-parameters (path)
+  (car (str:split #\? path)))
+
+
+;; Convert the parameters of a URI pathname into an associative list.
+;; "/path/a/b?a=1&b=2&c=3" → (("a" . "1") ("b" . "2") ("c" . "3"))
+(defun pathname-parameters (path)
+  (mapcar
+   (lambda (pair)
+     (let ((pair-items (str:split #\= pair)))
+       (cons (car pair-items)
+             (cadr pair-items))))
+   (str:split #\&  (cadr (str:split #\? path)))))
 
 
 ;; Split a pathname into a list of its components.
