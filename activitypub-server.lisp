@@ -15,14 +15,15 @@
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 ;;
 
-(ql:quickload '(clack str yason))
+(ql:quickload '(alexandria clack str yason))
 
 
 ;; List of the server's usernames.
 (defun users () '("rod" "mum"))
 
 ;; Alist of the server's paths and their response functions.
-(defun directories () '(("u/" . http-user-dir)))
+(defun directories () '(("u/" . http-user-dir)
+                        (".well-known/webfinger" . http-webfinger)))
 
 
 ;; The default 404 response.
@@ -37,7 +38,20 @@
     ;; In case of request for the user's actor.
     (if (member user (users) :test 'string=)
         `(200 (:content-type "application/ld+json")
-              (,(user-actor user))))))
+              (,(user-actor env user))))))
+
+
+;; Respond to /.well-known/webfinger?resource=acct:* requests.
+(defun http-webfinger (env path-items params)
+  (let* ((resource (cdr (assoc "resource" params :test 'string=)))
+         (userhost (str:split #\@ (str:replace-all "acct:" "" resource))))
+    (if (and userhost
+             (string= (cadr userhost) (getf env :domain))
+             (member (car userhost) (users) :test 'string=))
+        `(200 (:content-type "application/json")
+              (,(user-webfinger env (car userhost))))
+        '(404 (:content-type "application/json")
+          ("Couldn't find user")))))
 
 
 ;; Returns the response data for Clack, given the request data `env`.
@@ -57,15 +71,16 @@
 
 ;; Start the server.
 (defparameter *handler*
-  (clack:clackup (lambda (env)
-                   (funcall 'server env))
-                 :server 'woo))
+  (let ((config '(:domain "localhost")))
+    (clack:clackup (lambda (env)
+                     (funcall 'server
+                              (append env config)))
+                   :server 'woo)))
 
 
 ;; The JSON of a user's actor.
-(defun user-actor (username)
-  (let* ((host "http://localhost")
-         (user-root (str:concat host "/u/" username)))
+(defun user-actor (config username)
+  (let* ((user-root (str:concat "https://" (getf config :domain) "/u/" username)))
     (yason:with-output-to-string* ()
       (yason:encode-alist
        `(("@context" . ("https://www.w3.org/ns/activitystreams"
@@ -75,6 +90,27 @@
          ("preferredUsername" . ,username)
          ("inbox" . ,(str:concat user-root "/inbox.json"))
          ("outbox" . ,(str:concat user-root  "/outbox.json")))))))
+
+
+;; Webfinger JSON — for requesting data on actors' addresses, etc.
+(defun user-webfinger (config username)
+  (yason:with-output-to-string* ()
+    (yason:encode
+     (alexandria:alist-hash-table
+      `(("subject"
+         . ,(str:concat "acct:" username "@" (getf config :domain)))
+        ("links"
+         ,(alexandria:alist-hash-table
+           `(("rel" . "self")
+             ("type" . "application/activity+json")
+             ("href"
+              . ,(str:concat "https://" (getf config :domain)
+                             "/u/" username))))
+         ,(alexandria:alist-hash-table
+           `(("rel" . "http://ostatus.org/schema/1.0/subscribe")
+             ("template"
+              . ,(str:concat "https://" (getf config :domain)
+                             "/ostatus/subscribe?acct={uri}"))))))))))
 
 
 ;; Given an associative list and a path decomposed into a list of
