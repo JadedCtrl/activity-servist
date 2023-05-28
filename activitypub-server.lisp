@@ -25,6 +25,8 @@
 (defun directories () '(("u/" . http-user-dir)
                         (".well-known/webfinger" . http-webfinger)))
 
+;; (defparameter *s* (start-server '(:domain "etc.xwx.moe")))
+
 
 ;; The default 404 response.
 (defun http-404 (env path-items params)
@@ -70,12 +72,13 @@
 
 
 ;; Start the server.
-(defparameter *handler*
-  (let ((config '(:domain "localhost")))
-    (clack:clackup (lambda (env)
-                     (funcall 'server
-                              (append env config)))
-                   :server 'woo)))
+(defun start-server (&optional (config '(:domain "localhost")))
+  (clack:clackup (lambda (env)
+                   (funcall 'server
+                            (append env config)))
+                 :server 'woo
+                 :address "0.0.0.0"
+                 :port 8080))
 
 
 ;; The JSON of a user's actor.
