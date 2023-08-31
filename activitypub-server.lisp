@@ -15,17 +15,68 @@
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 ;;
 
-(ql:quickload '(alexandria clack str yason))
+(ql:quickload '(alexandria asn1 clack cl-base64 ironclad purl str trivia trivial-utf-8 webtentacle yason))
 
 
 ;; List of the server's usernames.
-(defun users () '("rod" "mum"))
+(defun users () '("rod@localhost" "mum@localhost"))
 
 ;; Alist of the server's paths and their response functions.
-(defun directories () '(("u/" . http-user-dir)
-                        (".well-known/webfinger" . http-webfinger)))
+(defun directories () '(("u/" . http-dir) (".well-known/webfinger" . http-webfinger)))
 
-;; (defparameter *s* (start-server '(:domain "etc.xwx.moe")))
+
+(defun resource-userhost (resource)
+  "Given an account URI in webfinger-friendly format, return the corresponding)))
+username and host in a list. Whether or not these are valid… that’s your
+business!
+Ex:  acct:mom@bird.com → '(“mom” “bird.com”)"
+  (cond
+    ;; A @bird@mom-style resource
+    ((str:containsp "@" resource)
+     (let* ((sans-acct (if (str:starts-with-p "acct:" resource)
+                           (subseq resource 5)
+                           resource))
+            (sans-@ (if (str:starts-with-p "@" sans-acct)
+                        (subseq sans-acct 1)
+                        sans-acct)))
+       (destructuring-bind (user host)
+           (str:split "@" sans-@)
+         (cons user host))))
+    ;; A URL-style resource
+    ((str:containsp "/u/" resource)
+     (cons
+      (pathname-name resource)
+      (purl:url-host resource)))))
+
+
+(defun resource-valid-p (resource)
+  "Given a webfinger-style “resource”"
+  (let* ((userhost (resource-userhost resource))
+         (userhost-str (funcall #'str:concat (car userhost) "@" (cdr userhost))))
+   (member userhost-str (users)
+           :test (lambda (a b)
+                   (string-equal (string-downcase a)
+                                 (string-downcase b))))))
+
+
+(defun resource-info-func (resource)
+  "Given a webfinger RESOURCE, return a property-list of data on the given user…
+if they exist, that is.
+This is used by the WEBTENTACLE webfinger server; you can see information on
+the plist in the docstring for its WEBTENTACLE:SERVER function."
+  (let* ((userhost (resource-userhost resource))
+         (profile (str:concat "https://" (cdr userhost) "/users/" resource)))
+    (when (resource-valid-p resource)
+      (list
+       :subject resource
+       :links
+       `((href ,profile
+          rel  "http://webfinger.net/rel/profile-page"
+          type "text/html"
+               properties (:apple 3 :bear 4))
+         (href ,profile
+          rel  "self"
+          type "application/activity+json"))))))
 
 
 ;; The default 404 response.
@@ -43,17 +94,8 @@
               (,(user-actor env user))))))
 
 
-;; Respond to /.well-known/webfinger?resource=acct:* requests.
 (defun http-webfinger (env path-items params)
-  (let* ((resource (cdr (assoc "resource" params :test 'string=)))
-         (userhost (str:split #\@ (str:replace-all "acct:" "" resource))))
-    (if (and userhost
-             (string= (cadr userhost) (getf env :domain))
-             (member (car userhost) (users) :test 'string=))
-        `(200 (:content-type "application/json")
-              (,(user-webfinger env (car userhost))))
-        '(404 (:content-type "application/json")
-          ("Couldn't find user")))))
+  (webtentacle:server env (lambda (resource) (resource-info-func resource)) nil))
 
 
 ;; Returns the response data for Clack, given the request data `env`.
@@ -74,11 +116,11 @@
 ;; Start the server.
 (defun start-server (&optional (config '(:domain "localhost")))
   (clack:clackup (lambda (env)
-                   (funcall 'server
-                            (append env config)))
+                   (server (append env config)))
                  :server 'woo
                  :address "0.0.0.0"
                  :port 8080))
+
 
 
 ;; The JSON of a user's actor.
@@ -94,26 +136,6 @@
          ("inbox" . ,(str:concat user-root "/inbox.json"))
          ("outbox" . ,(str:concat user-root  "/outbox.json")))))))
 
-
-;; Webfinger JSON — for requesting data on actors' addresses, etc.
-(defun user-webfinger (config username)
-  (yason:with-output-to-string* ()
-    (yason:encode
-     (alexandria:alist-hash-table
-      `(("subject"
-         . ,(str:concat "acct:" username "@" (getf config :domain)))
-        ("links"
-         ,(alexandria:alist-hash-table
-           `(("rel" . "self")
-             ("type" . "application/activity+json")
-             ("href"
-              . ,(str:concat "https://" (getf config :domain)
-                             "/u/" username))))
-         ,(alexandria:alist-hash-table
-           `(("rel" . "http://ostatus.org/schema/1.0/subscribe")
-             ("template"
-              . ,(str:concat "https://" (getf config :domain)
-                             "/ostatus/subscribe?acct={uri}"))))))))))
 
 
 ;; Given an associative list and a path decomposed into a list of
@@ -157,4 +179,3 @@
 ;; "/u/bear/apple.txt" → '("u" "bear" "apple.txt")
 (defun pathname-components (pathname)
   (str:split #\/ pathname :omit-nulls 't))
-
