@@ -212,15 +212,33 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
 ;; So at the moment, keys are generated into PEM files by the openssl binary on
 ;; the host’s system; and the output of the openssl command is used to parse into
 ;; Ironclad keys.
-;; In the future, I’ll stop that. But at the moment,I want to focus on other core
-;; parts of ActivityPub; I’ve tired of messing with ASN1 & co.
+;; Yes, I know, this is absolutely horrific. Actually disgusting.
+;; But at the moment,I want to focus on other core parts of ActivityPub; I’ve
+;; tired of messing with ASN1 & co. That’s for another day! ^^
+(defun openssl-shell-generate-key-pair ()
+  "Generate a 2048-bit RSA key-pair in PEM-format using one’s `openssl` binary.
+It returns two values: The private key, then the public key."
+  (let* ((private-pem-key (inferior-shell:run/s "openssl genrsa 2048"))
+         (public-pem-key
+           (inferior-shell:run/s
+            `(inferior-shell:pipe (echo ,private-pem-key)
+                                  (openssl rsa -outform PEM -pubout)))))
+    (values private-pem-key
+            public-pem-key)))
 
-(defun parse-openssl-output (lines &optional (results '()))
+
+(defun openssl-shell-destructure-private-key (pem-string &optional results)
   "When passed the output of the shell command `openssl rsa -text -noout`, will
 parse the output into a plist containing relavent numbers:
   :n (modulus), :e (public exponent), :d (private exponent), :p (1st prime),
   :q (2nd prime), :e1 (1st exponent), :e2 (2nd exponent), and :c (coefficient)."
-  (let ((line (str:trim (car lines))))
+  (let* ((lines (if (stringp pem-string)
+                    (inferior-shell:run/lines
+                     `(inferior-shell:pipe
+                       (echo ,pem-string)
+                       (openssl rsa -text -noout)))
+                    pem-string))
+         (line (str:trim (car lines))))
     (cond
       ((not lines)
        (mapcar
@@ -230,23 +248,31 @@ parse the output into a plist containing relavent numbers:
               result-item))
         results))
       ((str:starts-with-p "Private" line)
-       (parse-openssl-output (cdr lines) results))
+       (openssl-shell-destructure-private-key
+        (cdr lines) results))
       ((str:starts-with-p "modulus:" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:n))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:n))))
       ((str:starts-with-p "prime1" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:p))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:p))))
       ((str:starts-with-p "prime2" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:q))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:q))))
       ((str:starts-with-p "exponent1" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:e1))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:e1))))
       ((str:starts-with-p "exponent2" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:e2))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:e2))))
       ((str:starts-with-p "coefficient" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:c))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:c))))
       ((str:starts-with-p "privateExponent" line)
-       (parse-openssl-output (cdr lines) (nconc results '(:d))))
+       (openssl-shell-destructure-private-key
+        (cdr lines) (nconc results '(:d))))
       ((str:starts-with-p "publicExponent" line)
-       (parse-openssl-output
+       (openssl-shell-destructure-private-key
         (cdr lines)
         (nconc
          results
@@ -263,21 +289,20 @@ parse the output into a plist containing relavent numbers:
               (total-string (if (stringp last-element)
                                 (str:concat last-element line)
                                 line)))
-         (parse-openssl-output (cdr lines)
-                               (if (stringp last-element)
-                                   (nconc (reverse (cdr (reverse results)))
-                                          (list total-string))
-                                   (nconc results
-                                          (list total-string)))))))))
+         (openssl-shell-destructure-private-key
+          (cdr lines)
+          (if (stringp last-element)
+              (nconc (reverse (cdr (reverse results)))
+                     (list total-string))
+              (nconc results
+                     (list total-string)))))))))
 
 
-(defun openssl-shell-pem-keypair (pem-file)
-  "Given a private RSA PEM file, this will parse it into two returned values:
-An Ironclad private key, and an Ironclad public key."
+(defun openssl-shell-import-key-pair (private-pem-string)
+  "Given the string value of a private RSA PEM file, this will parse it into two
+returned values: An Ironclad private key, and an Ironclad public key."
   (let ((key-values
-          (parse-openssl-output
-           (inferior-shell:run/lines
-            (str:concat "openssl rsa -text -noout -in " pem-file)))))
+          (openssl-shell-destructure-private-key private-pem-string)))
     (values (ironclad:make-private-key
              :rsa
              :n (getf key-values :n)
@@ -286,6 +311,6 @@ An Ironclad private key, and an Ironclad public key."
              :p (getf key-values :p)
              :q (getf key-values :q))
             (ironclad:make-public-key
-                         :rsa
-                         :n (getf key-values :n)
-                         :e (getf key-values :e)))))
+             :rsa
+             :n (getf key-values :n)
+             :e (getf key-values :e)))))
