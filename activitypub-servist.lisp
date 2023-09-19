@@ -27,7 +27,24 @@
 
 (defun directories ()
   "Alist of the server's paths and their response functions."
-  '(("u/" . http-user-dir) (".well-known/webfinger" . http-webfinger)))
+  '(("u/" . http-user-dir)
+    (".well-known/webfinger" . http-webfinger)
+    (".well-known/host-meta" . http-host-meta)))
+
+
+
+;; ————————————————————————————————————————
+;; Host-info response
+;; ————————————————————————————————————————
+(defun http-host-meta (&optional env path-items params)
+  `(200 (:content-type "application/xrd+xml; charset=utf-8")
+    (,(str:concat "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<XRD xmlns=\"http://docs.oasis-open.org/ns/xri/xrd-1.0\">
+<link rel=\"lrdd\" template=\"https://"
+                  (getf env :domain)
+                  "/.well-known/webfinger?resource={uri}\"/>
+</XRD>
+"))))
 
 
 
