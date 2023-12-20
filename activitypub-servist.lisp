@@ -22,7 +22,13 @@
 
 (defun users ()
   "List of the server's usernames."
-  '("rod@localhost" "mum@localhost"))
+  '("servisto"))
+
+
+(defun userhosts ()
+  "List of the server's usernames + hostname."
+  (mapcar (lambda (username) (str:concat username "@" "etc.xwx.moe"))
+          (users)))
 
 
 (defun directories ()
@@ -40,7 +46,7 @@
   `(200 (:content-type "application/xrd+xml; charset=utf-8")
     (,(str:concat "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <XRD xmlns=\"http://docs.oasis-open.org/ns/xri/xrd-1.0\">
-<link rel=\"lrdd\" template=\"https://"
+<link rel=\"lrdd\" type=\"application/xrd+xml\" template=\"https://"
                   (getf env :domain)
                   "/.well-known/webfinger?resource={uri}\"/>
 </XRD>
@@ -83,7 +89,7 @@ Ex:  acct:mom@bird.com → '(“mom” “bird.com”)"
   "Given a webfinger-style “resource”"
   (let* ((userhost (resource-userhost resource))
          (userhost-str (funcall #'str:concat (car userhost) "@" (cdr userhost))))
-   (member userhost-str (users)
+   (member userhost-str (userhosts)
            :test (lambda (a b)
                    (string-equal (string-downcase a)
                                  (string-downcase b))))))
@@ -95,18 +101,21 @@ if they exist, that is.
 This is used by the WEBTENTACLE webfinger server; you can see information on
 the plist in the docstring for its WEBTENTACLE:SERVER function."
   (let* ((userhost (resource-userhost resource))
-         (profile (str:concat "https://" (cdr userhost) "/users/" resource)))
+         (profile (str:concat "https://" (cdr userhost) "/u/" (car userhost))))
     (when (resource-valid-p resource)
       (list
-       :subject resource
+       :subject (str:concat "acct:" (car userhost) "@" (cdr userhost))
+       :aliases `(,profile)
        :links
        `((href ,profile
-          rel  "http://webfinger.net/rel/profile-page"
-          type "text/html"
-               properties (:apple 3 :bear 4))
+               rel  "self"
+               type "application/activity+json")
          (href ,profile
-          rel  "self"
-          type "application/activity+json"))))))
+               rel "self"
+               type "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"")
+         (template ,(str:concat "https://" (cdr userhost) "/ostatus_subscribe?acct={uri}")
+                   rel "http://ostatus.org/schema/1.0/subscribe"))))))
+
 
 
 
@@ -124,16 +133,103 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
 
 (defun user-actor (config username)
   "The JSON of a user's actor."
-  (let* ((user-root (str:concat "https://" (getf config :domain) "/u/" username)))
+  (let* ((user-root (str:concat "https://" (getf config :domain) "/u/" username))
+         (yason:*symbol-encoder* 'yason:encode-symbol-as-lowercase))
     (yason:with-output-to-string* ()
       (yason:encode-alist
        `(("@context" . ("https://www.w3.org/ns/activitystreams"
-                        "https://w3id.org/security/v1"))
+                        "https://litepub.social/litepub/context.jsonld"))
          ("id" . ,user-root)
          ("type" . "Person")
          ("preferredUsername" . ,username)
+         ("name" . "Servistiĉo")
          ("inbox" . ,(str:concat user-root "/inbox.json"))
-         ("outbox" . ,(str:concat user-root  "/outbox.json")))))))
+         ("outbox" . ,(str:concat user-root  "/outbox.json"))
+         ("summary" . "Mi estas simpla roboto, kiu montras ke iomete ekfunkcias activitypub-servist.
+… ĉu mi rajtas demeti la servistinan kostumon, nun?
+Mi ne estas knabino!!")
+         ("icon"
+          . ,(alexandria:plist-hash-table
+              (list
+               "type" "Image"
+               "url" "https://xwx.moe/etc/servisticho-profilbildo.png")))
+         ("image"
+          . ,(alexandria:plist-hash-table
+              (list
+               "type" "Image"
+               "url" "https://xwx.moe/etc/servisticho-standardo.png")))
+         ("publicKey"
+          . ,(alexandria:plist-hash-table
+              (list
+               "id" (str:concat user-root "#main-key")
+               "owner" user-root
+               "publicKeyPem" *pubkey*))))))))
+
+
+
+;; ————————————————————————————————————————
+;; Sending a note
+;; ————————————————————————————————————————
+(defun note-json (from to text)
+  "The JSON of a user's actor."
+  (let* ((user-root (str:concat "https://etc.xwx.moe/u/" from))
+         (yason:*symbol-encoder* 'yason:encode-symbol-as-lowercase))
+    (yason:with-output-to-string* ()
+      (yason:encode-alist
+       `(("@context" . ("https://www.w3.org/ns/activitystreams"
+                        "https://litepub.social/litepub/context.jsonld"))
+         ("id" . ,(format nil "~A" (random 900000)))
+         ("actor" . ,user-root)
+         ("type" . "Create")
+         ("object"
+          . ,(alexandria:plist-hash-table
+              (list
+               "id" (format nil "~A" (random 900000))
+               "type" "Note"
+               "attributedTo" user-root
+               "content" text
+               "to" (if (listp to) to (list to))))))))))
+
+
+(defvar +date-header-datetime-format+
+  '(:short-weekday ", " (:day 2) " " :short-month " " (:year 4) " "
+    (:hour 2) #\: (:min 2) #\: (:sec 2) " " :timezone))
+
+
+(defun note-headers (inbox from to text)
+  (let* ((json (note-json from to text))
+         (inbox-uri (quri:uri inbox))
+         (digest-header (str:concat "SHA-256=" (string-sha256sum json)))
+         (date-header
+           (let ((local-time:*default-timezone* local-time:+gmt-zone+))
+             (local-time:format-timestring
+              nil (local-time:now)
+              :format +date-header-datetime-format+)))
+         (signed-headers (str:unlines
+                          (list
+                           (str:concat "(request target): post " (quri:uri-path inbox-uri))
+                           (str:concat "host: " (quri:uri-host inbox-uri))
+                           (str:concat "date: " date-header)
+                           (str:concat "digest: " digest-header))))
+         (signature (base64:usb8-array-to-base64-string
+                     (ironclad:sign-message (openssl-shell-import-key-pair *privkey*)
+                                            (string-to-ub8-vector signed-headers))))
+         (signature-header (str:concat "keyId=\"" from "#main-key\","
+                                       "headers=\"(request-target) host date digest\","
+                                       "algorithm=\"rsa-sha256\","
+                                       "signature=\"" signature "\"")))
+    `(("Date" . ,date-header)
+      ("Digest" . ,digest-header)
+      ("Signature" . ,signature-header)
+      ("Host" . ,(quri:uri-host inbox-uri))
+      ("Content-Length" . ,(length json))
+      ("Content-Type" . "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\""))))
+
+
+(defun send-note (inbox from to text)
+  (dexador:post inbox :content (note-json from to text)
+                      :headers (note-headers inbox from to text)))
+
 
 
 
@@ -145,12 +241,14 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
   '(404 (:content-type "text/plain")
     ("404, you goddamn fool!")))
 
+(defvar *logs* '())
 
 ;; ————————————————————————————————————————
 ;; Invocation
 ;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request data `env`."
+  (setq *logs* (append *logs* (list env)))
   (let* ((path (pathname-sans-parameters (getf env :request-uri)))
          (params (pathname-parameters (getf env :request-uri)))
          (response-function
@@ -160,17 +258,18 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
          (path-sans-response-root
            (pathname-components
             (str:replace-first (car response-function) "" path))))
+    (format nil "Path: ~s" path)
     (or (funcall (cdr response-function) env path-sans-response-root params)
         (funcall 'http-404 env path-sans-response-root params))))
 
 
-(defun start-server (&optional (config '(:domain "localhost")))
+(defun start-server (&optional (config '(:domain "etc.xwx.moe")))
   "Start the server."
   (clack:clackup (lambda (env)
                    (server (append env config)))
                  :server 'woo
                  :address "0.0.0.0"
-                 :port 8080))
+                 :port (getf config :port)))
 
 
 
@@ -218,6 +317,32 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
   "Split a pathname into a list of its components.
 “/u/bear/apple.txt” → '(“u” “bear” “apple.txt”)"
   (str:split #\/ pathname :omit-nulls 't))
+
+
+(defun string-to-ub8-vector (string)
+  "Convert the given STRING into an unsigned 8-bit vector."
+  (coerce
+   (loop for char across string
+         collect (char-code char))
+   '(vector (unsigned-byte 8))))
+
+
+(defun digest-string (digest-spec string)
+  "Compute the digest of a STRING, given an Ironclad DIGEST-SPEC."
+  (ironclad:digest-sequence digest-spec (string-to-ub8-vector string)))
+
+
+(defun string-sha256sum (string)
+  "Compute the sha256 checksum of a STRING, in hexadecimal string-format."
+  (base64:usb8-array-to-base64-string
+   (digest-string (ironclad:make-digest :sha256) string)))
+
+
+(defun sequence-hexadecimal-string (sequence)
+  (reduce #'str:concat
+          (loop for number across
+                sequence
+                collect (format nil "~X" number))))
 
 
 
