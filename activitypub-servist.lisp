@@ -112,7 +112,7 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
                type "application/activity+json")
          (href ,profile
                rel "self"
-               type "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"")
+               type "application/activity+json")
          (template ,(str:concat "https://" (cdr userhost) "/ostatus_subscribe?acct={uri}")
                    rel "http://ostatus.org/schema/1.0/subscribe"))))))
 
@@ -127,7 +127,7 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
   (let ((user (car path-items)))
     ;; In case of request for the user's actor.
     (if (member user (users) :test 'string=)
-        `(200 (:content-type "application/ld+json")
+        `(200 (:content-type "application/activity+json")
               (,(user-actor env user))))))
 
 
@@ -223,7 +223,8 @@ Mi ne estas knabino!!")
       ("Signature" . ,signature-header)
       ("Host" . ,(quri:uri-host inbox-uri))
       ("Content-Length" . ,(length json))
-      ("Content-Type" . "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\""))))
+      ("Accept" . "application/activity+json")
+      ("Content-Type" . "application/activity+json"))))
 
 
 (defun send-note (inbox from to text)
