@@ -1,4 +1,4 @@
-;;; Copyright © 2023 Jaidyn Levesque <jadedctrl@posteo.at>
+;;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;;
 ;;; This program is free software: you can redistribute it and/or
 ;;; modify it under the terms of the GNU Affero General Public License
@@ -22,7 +22,7 @@
 
 (defun users ()
   "List of the server's usernames."
-  '("servisto"))
+  '("servistchjo"))
 
 
 (defun userhosts ()
@@ -36,6 +36,10 @@
   '(("u/" . http-user-dir)
     (".well-known/webfinger" . http-webfinger)
     (".well-known/host-meta" . http-host-meta)))
+
+
+(defvar *privkey* (alexandria:read-file-into-string #p"enc/privkey.pem"))
+(defvar *pubkey* (alexandria:read-file-into-string #p"enc/pubkey.pem"))
 
 
 
@@ -126,7 +130,7 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
 (defun http-user-dir (env path-items params)
   (let ((user (car path-items)))
     ;; In case of request for the user's actor.
-    (if (member user (users) :test 'string=)
+    (if (member user (users) :test 'equal)
         `(200 (:content-type "application/activity+json")
               (,(user-actor env user))))))
 
@@ -139,12 +143,15 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
       (yason:encode-alist
        `(("@context" . ("https://www.w3.org/ns/activitystreams"
                         "https://litepub.social/litepub/context.jsonld"))
+         ("endpoints" . ,(alexandria:plist-hash-table (list "sharedInbox" "https://etc.xwx.moe/inbox")))
+         ("url" . ,user-root)
          ("id" . ,user-root)
          ("type" . "Person")
          ("preferredUsername" . ,username)
          ("name" . "Servistiĉo")
-         ("inbox" . ,(str:concat user-root "/inbox.json"))
-         ("outbox" . ,(str:concat user-root  "/outbox.json"))
+         ("inbox" . ,(str:concat user-root "/inbox"))
+         ("outbox" . ,(str:concat user-root  "/outbox"))
+         ("discoverable" . t)
          ("summary" . "Mi estas simpla roboto, kiu montras ke iomete ekfunkcias activitypub-servist.
 … ĉu mi rajtas demeti la servistinan kostumon, nun?
 Mi ne estas knabino!!")
@@ -152,7 +159,7 @@ Mi ne estas knabino!!")
           . ,(alexandria:plist-hash-table
               (list
                "type" "Image"
-               "url" "https://xwx.moe/etc/servisticho-profilbildo.png")))
+               "url" "https://xwx.moe/etc/servisticho-profilbildo.jpg")))
          ("image"
           . ,(alexandria:plist-hash-table
               (list
@@ -196,27 +203,29 @@ Mi ne estas knabino!!")
     (:hour 2) #\: (:min 2) #\: (:sec 2) " " :timezone))
 
 
-(defun note-headers (inbox from to text)
-  (let* ((json (note-json from to text))
-         (inbox-uri (quri:uri inbox))
+(defun note-headers (inbox from to json)
+  (let* ((inbox-uri (quri:uri inbox))
          (digest-header (str:concat "SHA-256=" (string-sha256sum json)))
          (date-header
            (let ((local-time:*default-timezone* local-time:+gmt-zone+))
              (local-time:format-timestring
               nil (local-time:now)
               :format +date-header-datetime-format+)))
-         (signed-headers (str:unlines
-                          (list
-                           (str:concat "(request target): post " (quri:uri-path inbox-uri))
-                           (str:concat "host: " (quri:uri-host inbox-uri))
-                           (str:concat "date: " date-header)
-                           (str:concat "digest: " digest-header))))
+         (signed-headers
+           (concatenate
+            'string
+            (format nil "(request-target): post ~A~%" (quri:uri-path inbox-uri))
+            (format nil "host: ~A~%" (quri:uri-host inbox-uri))
+            (format nil "date: ~A~%" date-header)
+            (format nil "digest: ~A" digest-header)))
          (signature (base64:usb8-array-to-base64-string
                      (ironclad:sign-message (openssl-shell-import-key-pair *privkey*)
-                                            (string-to-ub8-vector signed-headers))))
+                                            (string-to-ub8-vector
+                                             (string-sha256sum signed-headers)))))
+         (signature (openssl-shell-sign-string *privkey* signed-headers))
          (signature-header (str:concat "keyId=\"" from "#main-key\","
-                                       "headers=\"(request-target) host date digest\","
                                        "algorithm=\"rsa-sha256\","
+                                       "headers=\"(request-target) host date digest\","
                                        "signature=\"" signature "\"")))
     `(("Date" . ,date-header)
       ("Digest" . ,digest-header)
@@ -228,8 +237,10 @@ Mi ne estas knabino!!")
 
 
 (defun send-note (inbox from to text)
-  (dexador:post inbox :content (note-json from to text)
-                      :headers (note-headers inbox from to text)))
+  (let* ((json (note-json from to text))
+         (headers (note-headers inbox from to json)))
+    (dexador:post inbox :content json
+                        :headers headers)))
 
 
 
@@ -249,7 +260,7 @@ Mi ne estas knabino!!")
 ;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request data `env`."
-  (setq *logs* (append *logs* (list env)))
+  (setq *logs* (append *logs* (list env (babel:octets-to-string (alexandria:read-stream-content-into-byte-vector (getf env :raw-body))))))
   (let* ((path (pathname-sans-parameters (getf env :request-uri)))
          (params (pathname-parameters (getf env :request-uri)))
          (response-function
@@ -264,7 +275,7 @@ Mi ne estas knabino!!")
         (funcall 'http-404 env path-sans-response-root params))))
 
 
-(defun start-server (&optional (config '(:domain "etc.xwx.moe")))
+(defun start-server (&optional (config '(:domain "localhost" :port 8080)))
   "Start the server."
   (clack:clackup (lambda (env)
                    (server (append env config)))
@@ -457,3 +468,16 @@ returned values: An Ironclad private key, and an Ironclad public key."
              :rsa
              :n (getf key-values :n)
              :e (getf key-values :e)))))
+
+
+(defun openssl-shell-sign-string (private-pem-string string)
+  "Use the OpenSSL binary on the host system to RSS-SHA256 sign a STRING with a
+private key."
+  (alexandria:write-string-into-file private-pem-string #p"private.pem" :if-exists :overwrite)
+  (apply #'str:concat
+         (inferior-shell:run/lines
+          `(inferior-shell:pipe
+            (printf ,string)
+            (openssl dgst -sha256 -sign private.pem -)
+            (base64)))))
+ 
