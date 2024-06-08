@@ -38,8 +38,8 @@
     (".well-known/host-meta" . http-host-meta)))
 
 
-(defvar *privkey* (alexandria:read-file-into-string #p"enc/privkey.pem"))
-(defvar *pubkey* (alexandria:read-file-into-string #p"enc/pubkey.pem"))
+(defvar *privkey* (alexandria:read-file-into-string #p"../enc/privkey.pem"))
+(defvar *pubkey* (alexandria:read-file-into-string #p"../enc/pubkey.pem"))
 
 
 
@@ -474,11 +474,11 @@ returned values: An Ironclad private key, and an Ironclad public key."
 (defun openssl-shell-sign-string (private-pem-string string)
   "Use the OpenSSL binary on the host system to RSS-SHA256 sign a STRING with a
 private key."
-  (alexandria:write-string-into-file private-pem-string #p"private.pem" :if-exists :overwrite)
+  (alexandria:write-string-into-file private-pem-string #p"/tmp/private.pem" :if-does-not-exist :create :if-exists :overwrite)
   (apply #'str:concat
          (inferior-shell:run/lines
           `(inferior-shell:pipe
             (printf ,string)
-            (openssl dgst -sha256 -sign private.pem -)
+            (openssl dgst -sha256 -sign /tmp/private.pem -)
             (base64)))))
- 
+
