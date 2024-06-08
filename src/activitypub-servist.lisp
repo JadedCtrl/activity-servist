@@ -116,7 +116,7 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
                type "application/activity+json")
          (href ,profile
                rel "self"
-               type "application/activity+json")
+               type "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"")
          (template ,(str:concat "https://" (cdr userhost) "/ostatus_subscribe?acct={uri}")
                    rel "http://ostatus.org/schema/1.0/subscribe"))))))
 
@@ -142,6 +142,7 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
     (yason:with-output-to-string* ()
       (yason:encode-alist
        `(("@context" . ("https://www.w3.org/ns/activitystreams"
+                        "https://w3id.org/security/v1"
                         "https://litepub.social/litepub/context.jsonld"))
          ("endpoints" . ,(alexandria:plist-hash-table (list "sharedInbox" "https://etc.xwx.moe/inbox")))
          ("url" . ,user-root)
@@ -179,7 +180,7 @@ Mi ne estas knabino!!")
 ;; ————————————————————————————————————————
 (defun note-json (from to text)
   "The JSON of a user's actor."
-  (let* ((user-root (str:concat "https://etc.xwx.moe/u/" from))
+  (let* ((user-root from)
          (yason:*symbol-encoder* 'yason:encode-symbol-as-lowercase))
     (yason:with-output-to-string* ()
       (yason:encode-alist
