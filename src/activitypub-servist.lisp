@@ -1,17 +1,19 @@
-;;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
-;;;
-;;; This program is free software: you can redistribute it and/or
-;;; modify it under the terms of the GNU Affero General Public License
-;;; as published by the Free Software Foundation, either version 3 of
-;;; the License, or (at your option) any later version.
-;;;
-;;; This program is distributed in the hope that it will be useful,
-;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-;;; GNU Affero General Public License for more details.
-;;;
-;;; You should have received a copy of the GNU Affero General Public License
-;;; along with this program. If not, see <https://www.gnu.org/licenses/>.
+;;;; activitypub-servist: An ActivityPub server framework.
+
+;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
+;;
+;; This program is free software: you can redistribute it and/or
+;; modify it under the terms of the GNU Affero General Public License
+;; as published by the Free Software Foundation, either version 3 of
+;; the License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+;; GNU Affero General Public License for more details.
+;;
+;; You should have received a copy of the GNU Affero General Public License
+;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 (defpackage #:activitypub-servist
   (:use #:cl #:activitypub-servist/signatures)
@@ -24,12 +26,10 @@
   "List of the server's usernames."
   '("servistchjo"))
 
-
 (defun userhosts ()
   "List of the server's usernames + hostname."
   (mapcar (lambda (username) (str:concat username "@" "etc.xwx.moe"))
           (users)))
-
 
 (defun directories ()
   "Alist of the server's paths and their response functions."
@@ -43,9 +43,8 @@
 
 
 
-;; ————————————————————————————————————————
-;; Host-info response
-;; ————————————————————————————————————————
+;;; Host-info response
+;;; ————————————————————————————————————————
 (defun http-host-meta (&optional env path-items params)
   `(200 (:content-type "application/xrd+xml; charset=utf-8")
     (,(str:concat "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -58,12 +57,10 @@
 
 
 
-;; ————————————————————————————————————————
-;; Webfinger response
-;; ————————————————————————————————————————
+;;; Webfinger response
+;;; ————————————————————————————————————————
 (defun http-webfinger (env path-items params)
   (webtentacle:server env (lambda (resource) (resource-info-func resource)) nil))
-
 
 (defun resource-userhost (resource)
   "Given an account URI in webfinger-friendly format, return the corresponding)))
@@ -88,7 +85,6 @@ Ex:  acct:mom@bird.com → '(“mom” “bird.com”)"
       (pathname-name resource)
       (purl:url-host resource)))))
 
-
 (defun resource-valid-p (resource)
   "Given a webfinger-style “resource”"
   (let* ((userhost (resource-userhost resource))
@@ -97,7 +93,6 @@ Ex:  acct:mom@bird.com → '(“mom” “bird.com”)"
            :test (lambda (a b)
                    (string-equal (string-downcase a)
                                  (string-downcase b))))))
-
 
 (defun resource-info-func (resource)
   "Given a webfinger RESOURCE, return a property-list of data on the given user…
@@ -121,19 +116,16 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
                    rel "http://ostatus.org/schema/1.0/subscribe"))))))
 
 
-
 
-;; ————————————————————————————————————————
-;; User info response(s)
-;; ————————————————————————————————————————
-;; Respond to requests within the /u/* directory.
+;;; User info response(s)
+;;; ————————————————————————————————————————
 (defun http-user-dir (env path-items params)
+  "Respond to requests within the /u/* directory."
   (let ((user (car path-items)))
     ;; In case of request for the user's actor.
     (if (member user (users) :test 'equal)
         `(200 (:content-type "application/activity+json")
               (,(user-actor env user))))))
-
 
 (defun user-actor (config username)
   "The JSON of a user's actor."
@@ -175,9 +167,8 @@ Mi ne estas knabino!!")
 
 
 
-;; ————————————————————————————————————————
-;; Sending a note
-;; ————————————————————————————————————————
+;;; Sending a note
+;;; ————————————————————————————————————————
 (defun note-json (from to text)
   "The JSON of a user's actor."
   (let* ((user-root from)
@@ -198,11 +189,9 @@ Mi ne estas knabino!!")
                "content" text
                "to" (if (listp to) to (list to))))))))))
 
-
 (defvar +date-header-datetime-format+
   '(:short-weekday ", " (:day 2) " " :short-month " " (:year 4) " "
     (:hour 2) #\: (:min 2) #\: (:sec 2) " " :timezone))
-
 
 (defun note-headers (inbox from to json)
   (let* ((inbox-uri (quri:uri inbox))
@@ -236,7 +225,6 @@ Mi ne estas knabino!!")
       ("Accept" . "application/activity+json")
       ("Content-Type" . "application/activity+json"))))
 
-
 (defun send-note (inbox from to text)
   (let* ((json (note-json from to text))
          (headers (note-headers inbox from to json)))
@@ -244,11 +232,9 @@ Mi ne estas knabino!!")
                         :headers headers)))
 
 
-
 
-;; ————————————————————————————————————————
-;; Misc. responses
-;; ————————————————————————————————————————
+;;; Misc. responses
+;;; ————————————————————————————————————————
 (defun http-404 (env path-items params)
   "The default 404 response."
   '(404 (:content-type "text/plain")
@@ -256,9 +242,10 @@ Mi ne estas knabino!!")
 
 (defvar *logs* '())
 
-;; ————————————————————————————————————————
-;; Invocation
-;; ————————————————————————————————————————
+
+
+;;; Invocation
+;;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request data `env`."
   (setq *logs* (append *logs* (list env (babel:octets-to-string (alexandria:read-stream-content-into-byte-vector (getf env :raw-body))))))
@@ -275,7 +262,6 @@ Mi ne estas knabino!!")
     (or (funcall (cdr response-function) env path-sans-response-root params)
         (funcall 'http-404 env path-sans-response-root params))))
 
-
 (defun start-server (&optional (config '(:domain "localhost" :port 8080)))
   "Start the server."
   (clack:clackup (lambda (env)
@@ -286,9 +272,8 @@ Mi ne estas knabino!!")
 
 
 
-;; ————————————————————————————————————————
-;; Utils.
-;; ————————————————————————————————————————
+;;; Utils.
+;;; ————————————————————————————————————————
 (defun assoc-by-path (alist path-items &optional (depth 0))
   "Given an associative list and a path decomposed into a list of
 its components, return the item with the closest according
@@ -308,12 +293,10 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
                   (cdr (reverse path-items)))
            (+ depth 1))))))
 
-
 (defun pathname-sans-parameters (path)
   "Removes parameters from a URI pathname, returning the bare path.
 “/path/a/b?a=1&b=3” → “/path/a/b”"
   (car (str:split #\? path)))
-
 
 (defun pathname-parameters (path)
   "Convert the parameters of a URI pathname into an associative list.
@@ -325,13 +308,10 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
              (cadr pair-items))))
    (str:split #\&  (cadr (str:split #\? path)))))
 
-
 (defun pathname-components (pathname)
   "Split a pathname into a list of its components.
 “/u/bear/apple.txt” → '(“u” “bear” “apple.txt”)"
   (str:split #\/ pathname :omit-nulls 't))
-
-
 
 (defun sequence-hexadecimal-string (sequence)
   (reduce #'str:concat
