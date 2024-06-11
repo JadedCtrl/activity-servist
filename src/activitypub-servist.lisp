@@ -17,6 +17,7 @@
 
 (defpackage #:activitypub-servist
   (:use #:cl #:activitypub-servist/signatures)
+  (:nicknames "AP-S")
   (:export :server :start-server))
 
 (in-package #:activitypub-servist)

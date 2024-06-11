@@ -17,6 +17,7 @@
 
 (defpackage #:activitypub-servist/signatures
   (:use #:cl)
+  (:nicknames "AP-S/S")
   (:export :openssl-shell-generate-key-pair
            :openssl-shell-sign-string :openssl-shell-import-key-pair
            :digest-string :string-sha256sum))
@@ -154,16 +155,11 @@ private key."
 ;;; ————————————————————————————————————————
 (defun digest-string (digest-spec string)
   "Compute the digest of a STRING, given an Ironclad DIGEST-SPEC."
-  (ironclad:digest-sequence digest-spec (string-to-ub8-vector string)))
+  (ironclad:digest-sequence
+   digest-spec
+   (flexi-streams:string-to-octets string :external-format 'utf-8)))
 
 (defun string-sha256sum (string)
   "Compute the sha256 checksum of a STRING, in hexadecimal string-format."
   (base64:usb8-array-to-base64-string
    (digest-string (ironclad:make-digest :sha256) string)))
-
-(defun string-to-ub8-vector (string)
-  "Convert the given STRING into an unsigned 8-bit vector."
-  (coerce
-   (loop for char across string
-         collect (char-code char))
-   '(vector (unsigned-byte 8))))

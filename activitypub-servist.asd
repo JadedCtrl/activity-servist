@@ -21,5 +21,26 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
 
-  :depends-on ("cl-base64" "inferior-shell" "ironclad" "str")
+  :depends-on ("cl-base64" "flexi-streams" "inferior-shell" "ironclad" "str")
   :components ((:file "src/signatures")))
+
+
+
+;;; Tests
+;;; —————————————————————————————————————
+(asdf:defsystem "activitypub-servist/tests/signatures"
+  :version "0.0"
+  :license "AGPLv3"
+  :author "Jaidyn Ann <jadedctrl@posteo.at>"
+  :description "Tests for the the activitypub-servist/signatures package."
+
+  :depends-on (:activitypub-servist/signatures :lisp-unit2)
+  :components ((:file "t/signatures")))
+
+;; Following method tweaked from lisp-unit2’s documentation:
+;; https://github.com/AccelerationNet/lisp-unit2/blob/master/README.md#asdf
+(defmethod asdf:perform
+    ((o asdf:test-op) (c (eql (asdf:find-system :activitypub-servist/tests/signatures))))
+  (eval (read-from-string
+         "(lisp-unit2:with-summary ()
+            (lisp-unit2:run-tests :package :activitypub-servist/tests/signatures))")))
