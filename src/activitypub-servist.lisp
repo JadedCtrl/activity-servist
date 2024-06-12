@@ -209,11 +209,7 @@ Mi ne estas knabino!!")
             (format nil "host: ~A~%" (quri:uri-host inbox-uri))
             (format nil "date: ~A~%" date-header)
             (format nil "digest: ~A" digest-header)))
-;;         (signature (base64:usb8-array-to-base64-string
-;;                     (ironclad:sign-message (openssl-shell-import-key-pair *privkey*)
-;;                                            (string-to-ub8-vector
-;;                                             (string-sha256sum signed-headers))))
-         (signature (openssl-shell-sign-string *privkey* signed-headers))
+         (signature (sign-string *privkey* signed-headers))
          (signature-header (str:concat "keyId=\"" from "#main-key\","
                                        "algorithm=\"rsa-sha256\","
                                        "headers=\"(request-target) host date digest\","

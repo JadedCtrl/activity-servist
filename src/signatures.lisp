@@ -18,8 +18,8 @@
 (defpackage #:activitypub-servist/signatures
   (:use #:cl)
   (:nicknames "AP-S/S")
-  (:export :openssl-shell-generate-key-pair
-           :openssl-shell-sign-string :openssl-shell-import-key-pair
+  (:export :generate-key-pair
+           :sign-string :import-pem-key-pair
            :digest-string :string-sha256sum))
 
 (in-package #:activitypub-servist/signatures)
@@ -36,7 +36,8 @@
 ;; But at the moment,I want to focus on other core parts of ActivityPub; I’ve
 ;; tired of messing with ASN1 & co. That’s for another day! ^^
 
-(defun openssl-shell-generate-key-pair ()
+
+(defun generate-key-pair ()
   "Generate a 2048-bit RSA key-pair in PEM-format using one’s `openssl` binary.
 It returns two values: The private key, then the public key."
   (let* ((private-pem-key (inferior-shell:run/s "openssl genrsa 2048"))
@@ -47,7 +48,7 @@ It returns two values: The private key, then the public key."
     (values private-pem-key
             public-pem-key)))
 
-(defun openssl-shell-destructure-private-key (pem-string &optional results)
+(defun destructure-openssl-private-key (pem-string &optional results)
   "When passed the output of the shell command `openssl rsa -text -noout`, will
 parse the output into a plist containing relavent numbers:
   :n (modulus), :e (public exponent), :d (private exponent), :p (1st prime),
@@ -117,7 +118,7 @@ parse the output into a plist containing relavent numbers:
               (nconc results
                      (list total-string)))))))))
 
-(defun openssl-shell-import-key-pair (private-pem-string)
+(defun import-pem-key-pair (private-pem-string)
   "Given the string value of a private RSA PEM file, this will parse it into two
 returned values: An Ironclad private key, and an Ironclad public key."
   (let ((key-values
@@ -138,7 +139,7 @@ returned values: An Ironclad private key, and an Ironclad public key."
 
 ;;; Signing
 ;;; ————————————————————————————————————————
-(defun openssl-shell-sign-string (private-pem-string string)
+(defun sign-string (private-pem-string string)
   "Use the OpenSSL binary on the host system to RSS-SHA256 sign a STRING with a
 private key."
   (alexandria:write-string-into-file private-pem-string #p"/tmp/private.pem" :if-does-not-exist :create :if-exists :overwrite)
