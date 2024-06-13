@@ -116,3 +116,10 @@ of NAME."
 (defclass question (intransitive-activity) ())
 (defclass tentative-accept (accept) ())
 (defclass tentative-reject (reject) ())
+
+
+
+;;; Extended Actor types
+;;; ————————————————————————————————————————
+(defclass-empty-children actor
+  (application group organization person service))
