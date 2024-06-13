@@ -123,3 +123,29 @@ of NAME."
 ;;; ————————————————————————————————————————
 (defclass-empty-children actor
   (application group organization person service))
+
+
+
+;;; Extended Object types
+;;; ————————————————————————————————————————
+(defclass-empty-children object
+  (article document event note))
+
+(defclass-empty-children document
+  (audio image page video))
+
+;; https://www.w3.org/ns/activitystreams#Place
+(defclass-w-accessors place (object)
+  (accuracy altitude latitude longitude radius units))
+
+;;  https://www.w3.org/ns/activitystreams#Profile
+(defclass-w-accessors profile (object)
+  (describes))
+
+;; https://www.w3.org/ns/activitystreams#Relationship
+(defclass-w-accessors relationship (object)
+  (object relationship subject))
+
+;; https://www.w3.org/ns/activitystreams#Tombstone
+(defclass-w-accessors tombstone (object)
+  (former-type deleted))
