@@ -17,10 +17,20 @@
 
 (defpackage #:activitypub-servist/activity-vocabulary
   (:use #:cl)
+  (:nicknames "AP-S/AV" "AV")
+  (:shadow #:delete #:ignore #:listen #:read #:remove)
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
-  (:shadow #:delete #:ignore #:listen #:read #:remove)
-  (:nicknames "AP-S/AV" "AV"))
+  (:export
+   :accept :activity :add :announce :application :arrive :article :audio
+   :collection :collection-page :create :delete :dislike :document :event :flag
+   :follow :group :ignore :ignore :image :intransitive-activity :invite :join
+   :leave :like :link :link :listen :move :note :object :offer
+   :ordered-collection :ordered-collection-page :organization :page :person
+   :place :profile :question :read :reject :relationship :remove :service
+   :tentative-accept :tentative-reject :tombstone :travel :undo :update :video
+   :view))
+
 
 (in-package #:activitypub-servist/activity-vocabulary)
 
