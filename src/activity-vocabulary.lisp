@@ -149,3 +149,10 @@ of NAME."
 ;; https://www.w3.org/ns/activitystreams#Tombstone
 (defclass-w-accessors tombstone (object)
   (former-type deleted))
+
+
+
+;;; Extended Link types
+;;; ————————————————————————————————————————
+(defclass-empty-children link
+  (mention))
