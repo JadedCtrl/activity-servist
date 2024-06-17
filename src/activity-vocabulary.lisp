@@ -203,15 +203,6 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
 
 ;;; JSON serialization
 ;;; ————————————————————————————————————————
-(defun class-slots-to-camel-cased-strings-alist (class)
-  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
-their names in camel-case format."
-  (mapcar
-   (lambda (slot)
-     (let ((name (closer-mop:slot-definition-name slot)))
-      (cons name (str:camel-case (symbol-name name)))))
-   (closer-mop:class-direct-slots class)))
-
 ;; Ensure all classes have their slots’ encodings defined with YASON.
 (mapcar (lambda (class)
           (closer-mop:finalize-inheritance class)
@@ -219,3 +210,27 @@ their names in camel-case format."
         (mapcar #'find-class
                 '(object link activity collection collection-page
                   ordered-collection-page place profile relationship tombstone)))
+
+
+
+;;; Util
+;;; ————————————————————————————————————————
+(defun class-slots-to-camel-cased-strings-alist (class)
+  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
+their names in camel-case format."
+  (mapcar
+   (lambda (slot)
+     (let ((name (closer-mop:slot-definition-name slot)))
+      (cons name (camel-case (symbol-name name)))))
+   (closer-mop:class-direct-slots class)))
+
+(defun camel-case (string)
+  "Convert a STRING to camel-casing.
+Wrapper around STR:CAMEL-CASE, working around a bug that a non-alphanumeric
+character at the start of the string gets erroneously (or at least undesireably,
+to us) removed."
+  (if (not (alphanumericp (aref string 0)))
+      (concatenate 'string
+                   (string (aref string 0))
+                   (str:camel-case string))
+      (str:camel-case string)))
