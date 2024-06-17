@@ -100,8 +100,9 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
   (append
    `(defmethod yason:encode-slots progn ((obj ,class)))
    (mapcar (lambda (slot-key-pair)
-             `(yason:encode-object-element ,(cdr slot-key-pair)
-                                           (slot-value obj ',(car slot-key-pair))))
+             `(let ((value (slot-value obj ',(car slot-key-pair))))
+                (when value
+                  (yason:encode-object-element ,(cdr slot-key-pair) value))))
       (class-slots-to-camel-cased-strings-alist class))))
 
 
@@ -112,10 +113,14 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
 (defclass-w-accessors object ()
   (
    attachment attributed-to audience bcc bto cc content context
-   duration end-time generator icon image in-reply-to location
+   duration end-time generator icon id image in-reply-to location
    media-type name preview published replies start-time summary
    tag to updated url
    (@context :initform "https://www.w3.org/ns/activitystreams")))
+
+(defmethod yason:encode ((obj object) &optional (stream *standard-output*))
+  (yason:with-output (stream)
+    (yason:encode-object obj)))
 
 ;; https://www.w3.org/ns/activitystreams#Link
 (defclass-w-accessors link ()
