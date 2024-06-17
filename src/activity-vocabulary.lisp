@@ -73,6 +73,16 @@ of NAME."
              `(defclass ,a (,name) ()))
            direct-children)))
 
+(defmacro define-yason-encode-slots-to-camel-cased-keys (class)
+  "Define a YASON:ENCODE-SLOTS method for a CLASS, which simply encodes all of
+CLASS’es slots with JSON keys based on the camel-cased slot name."
+  (append
+   `(defmethod yason:encode-slots progn ((obj ,class)))
+   (mapcar (lambda (slot-key-pair)
+             `(yason:encode-object-element ,(cdr slot-key-pair)
+                                           (slot-value obj ',(car slot-key-pair))))
+      (class-slots-to-camel-cased-strings-alist class))))
+
 
 
 ;;; Core types
@@ -84,6 +94,13 @@ of NAME."
    duration end-time generator icon image in-reply-to location
    media-type name preview published replies start-time summary
    tag to updated url))
+
+(defgeneric json-ld-context (obj)
+  (:documentation "Return an object’s appropriate JSON-LD @context contents, in list-form.
+For use in serialization to JSON."))
+
+(defmethod json-ld-context ((object object))
+  "https://www.w3.org/ns/activitystreams")
 
 ;; https://www.w3.org/ns/activitystreams#Link
 (defclass-w-accessors link ()
@@ -106,11 +123,12 @@ of NAME."
 
 ;; https://www.w3.org/ns/activitystreams#CollectionPage
 (defclass-w-accessors collection-page (collection)
-   (next part-of prev))
+  (next part-of prev))
 
 ;; https://www.w3.org/ns/activitystreams#OrderedCollectionPage
 (defclass-w-accessors ordered-collection-page (collection-page)
   (start-index))
+
 
 
 
@@ -166,3 +184,24 @@ of NAME."
 ;;; ————————————————————————————————————————
 (defclass-empty-children link
   (mention))
+
+
+
+;;; JSON serialization
+;;; ————————————————————————————————————————
+(defun class-slots-to-camel-cased-strings-alist (class)
+  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
+their names in camel-case format."
+  (mapcar
+   (lambda (slot)
+     (let ((name (closer-mop:slot-definition-name slot)))
+      (cons name (str:camel-case (symbol-name name)))))
+   (closer-mop:class-direct-slots class)))
+
+;; Ensure all classes have their slots’ encodings defined with YASON.
+(mapcar (lambda (class)
+          (closer-mop:finalize-inheritance class)
+          (eval `(define-yason-encode-slots-to-camel-cased-keys ,class)))
+        (mapcar #'find-class
+                '(object link activity collection collection-page
+                  ordered-collection-page place profile relationship tombstone)))
