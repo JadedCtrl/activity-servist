@@ -22,6 +22,7 @@
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
   (:export
+   ;; Classes
    :accept :activity :add :announce :application :arrive :article :audio
    :collection :collection-page :create :delete :dislike :document :event :flag
    :follow :group :ignore :ignore :image :intransitive-activity :invite :join
@@ -29,8 +30,27 @@
    :ordered-collection :ordered-collection-page :organization :page :person
    :place :profile :question :read :reject :relationship :remove :service
    :tentative-accept :tentative-reject :tombstone :travel :undo :update :video
-   :view))
-
+   :view
+   ;; Slots
+   :activity-actor :activity-instrument :activity-object :activity-origin
+   :activity-result :activity-target
+   :collection-current :collection-first :collection-items :collection-last
+   :collection-total-items
+   :collection-page-next :collection-page-part-of :collection-page-prev
+   :link-height :link-href :link-hreflang :link-media-type :link-name
+   :link-preview :link-rel :link-width
+   :object-attachment :object-attributed-to :object-audience :object-bcc
+   :object-bto :object-cc :object-content :object-context :object-duration
+   :object-end-time :object-generator :object-icon :object-image
+   :object-in-reply-to :object-location :object-media-type :object-name
+   :object-preview :object-published :object-replies :object-start-time
+   :object-summary :object-tag :object-to :object-updated :object-url
+   :ordered-collection-page-start-index
+   :place-accuracy :place-altitude :place-latitude :place-longitude
+   :place-radius :place-units
+   :profile-describes
+   :relationship-object :relationship-relationship :relationship-subject
+   :tombstone-former-type :tombstone-deleted))
 
 (in-package #:activitypub-servist/activity-vocabulary)
 
