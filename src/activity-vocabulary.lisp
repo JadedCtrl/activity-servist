@@ -44,7 +44,8 @@
    :object-end-time :object-generator :object-icon :object-image
    :object-in-reply-to :object-location :object-media-type :object-name
    :object-preview :object-published :object-replies :object-start-time
-   :object-summary :object-tag :object-to :object-updated :object-url
+   :object-summary :object-tag :object-to :object-type :object-updated
+   :object-url
    :ordered-collection-page-start-index
    :place-accuracy :place-altitude :place-latitude :place-longitude
    :place-radius :place-units
@@ -115,12 +116,17 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
    attachment attributed-to audience bcc bto cc content context
    duration end-time generator icon id image in-reply-to location
    media-type name preview published replies start-time summary
-   tag to updated url
+   tag to type updated url
    (@context :initform "https://www.w3.org/ns/activitystreams")))
 
 (defmethod yason:encode ((obj object) &optional (stream *standard-output*))
   (yason:with-output (stream)
-    (yason:encode-object obj)))
+    (yason:with-object ()
+      (yason:encode-object obj)
+      (yason:encode-object-element
+       "type"
+       (or (object-type obj)
+           (class-pretty-name (class-of obj)))))))
 
 ;; https://www.w3.org/ns/activitystreams#Link
 (defclass-w-accessors link ()
@@ -239,3 +245,7 @@ to us) removed."
                    (string (aref string 0))
                    (str:camel-case string))
       (str:camel-case string)))
+
+(defun class-pretty-name (class)
+  "Return a CLASS’es name in a “pretty” (sentence-capitalized) string."
+  (string-capitalize (symbol-name (class-name class))))
