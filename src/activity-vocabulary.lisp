@@ -59,7 +59,8 @@ is equivalent to
          (typecase slot
            (list slot)
            (t (list slot :accessor (intern (format nil "~A-~A" name slot))
-                         :initarg  (intern (symbol-name slot) "KEYWORD")))))
+                         :initarg  (intern (symbol-name slot) "KEYWORD")
+                         :initform nil))))
        slots)
      ,@options))
 
@@ -93,14 +94,8 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
    attachment attributed-to audience bcc bto cc content context
    duration end-time generator icon image in-reply-to location
    media-type name preview published replies start-time summary
-   tag to updated url))
-
-(defgeneric json-ld-context (obj)
-  (:documentation "Return an object’s appropriate JSON-LD @context contents, in list-form.
-For use in serialization to JSON."))
-
-(defmethod json-ld-context ((object object))
-  "https://www.w3.org/ns/activitystreams")
+   tag to updated url
+   (@context :initform "https://www.w3.org/ns/activitystreams")))
 
 ;; https://www.w3.org/ns/activitystreams#Link
 (defclass-w-accessors link ()
@@ -130,7 +125,6 @@ For use in serialization to JSON."))
   (start-index))
 
 
-
 
 ;;; Extended Activity types
 ;;; ————————————————————————————————————————
@@ -149,7 +143,7 @@ For use in serialization to JSON."))
 
 ;;; Extended Actor types
 ;;; ————————————————————————————————————————
-(defclass-empty-children actor
+(defclass-empty-children object
   (application group organization person service))
 
 
