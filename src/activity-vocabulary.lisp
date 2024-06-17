@@ -119,15 +119,6 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
    tag to type updated url
    (@context :initform "https://www.w3.org/ns/activitystreams")))
 
-(defmethod yason:encode ((obj object) &optional (stream *standard-output*))
-  (yason:with-output (stream)
-    (yason:with-object ()
-      (yason:encode-object obj)
-      (yason:encode-object-element
-       "type"
-       (or (object-type obj)
-           (class-pretty-name (class-of obj)))))))
-
 ;; https://www.w3.org/ns/activitystreams#Link
 (defclass-w-accessors link ()
   (height href hreflang media-type name preview rel width))
@@ -214,6 +205,15 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
 
 ;;; JSON serialization
 ;;; ————————————————————————————————————————
+(defmethod yason:encode ((obj object) &optional (stream *standard-output*))
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:encode-object obj)
+      (yason:encode-object-element
+       "type"
+       (or (object-type obj)
+           (class-pretty-name (class-of obj)))))))
+
 ;; Ensure all classes have their slots’ encodings defined with YASON.
 (mapcar (lambda (class)
           (closer-mop:finalize-inheritance class)
