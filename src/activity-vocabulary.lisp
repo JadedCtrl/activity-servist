@@ -22,6 +22,10 @@
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
   (:export
+   ;; Functions
+   :parse
+   ;; Globals
+   :*ap-packages*
    ;; Classes
    :accept :activity :add :announce :application :arrive :article :audio
    :collection :collection-page :create :delete :dislike :document :event :flag
@@ -59,11 +63,18 @@
 
 ;;; Globals
 ;;; ————————————————————————————————————————
-;; Used in YASON:ENCODE to ensure that a single top-level @context can be
-;; created where AP objects contain other AP objects in their slots.
-;; This variable is overridden locally (LET), and should never be
-;; modified globally (as we expect it to be nil in top-level objects).
-(defparameter *@context* nil)
+(defparameter *ap-packages* (list *package*)
+  "A list of packages in which we should search for AP classes and slot-symbols
+during JSON parsing. The class-name searched for is simply the value of the JSON
+object’s “type” key. The package first in the list to export such a symbol
+is the winner.")
+
+;; Private, internal variable.
+(defparameter *@context* nil
+  "Used in YASON:ENCODE to ensure that a single top-level @context can be
+created where AP objects contain other AP objects in their slots.
+This variable is overridden locally during encoding (LET), and should never be
+modified globally (as we expect it to be nil in top-level objects.")
 
 
 
@@ -244,24 +255,75 @@ to us) removed."
 items in each will be contained in the resultant list."
   (append a (remove-if (lambda (item) (find item a :test #'equal)) b)))
 
+(defun find-registered-symbols (str)
+  "Find all symbols identified by string STR within packages in the
+*ap-packages* list."
+  (mapcar (lambda (package) (find-symbol (string-upcase str) package))
+          *ap-packages*))
+
+(defun find-registered-classes (str)
+  "Find all classes identified by string STR within pacakges in the
+*ap-packages* list."
+  (mapcar (lambda (sym) (find-class sym))
+          (find-registered-symbols str)))
+
+
+
+;;; JSON parsing
+;;; ————————————————————————————————————————
+(defun parse (string)
+  "Parse a string containing JSON into an ActivityPub object."
+  (parse-table (yason:parse string)))
+
+(defun parse-table (table)
+  "Parse a hash-table corresponding to YASON-parsed JSON into an ActivityPub object."
+  (let* ((class (car (find-registered-classes (gethash "type" table))))
+         (obj   (make-instance class)))
+    (loop for key being each hash-key of table
+          for val being each hash-value of table
+          do (let ((slot-sym (car (find-registered-symbols key)))
+                   (val      (parse-value val)))
+               (when slot-sym
+                 (setf (slot-value obj slot-sym) val))))
+    obj))
+
+(defun parse-value (val)
+  "Parse the value of a key found in YASON-parsed JSON.
+All ActivityPub objects (hash-tables containing “type”) will be parsed into
+ActivityPub objects; all others will parsed into associative lists."
+  (typecase val
+    (hash-table (maybe-parse-table val))
+    (list       (mapcar (lambda (a)
+                          (if (hash-table-p a)
+                              (maybe-parse-table a)
+                              a))
+                        val))
+    (t val)))
+
+(defun maybe-parse-table (table)
+  "If a hash-table seems to be a valid ActivityPub object, attempt parsing it
+into one. Otherwise, parse it into an associative list."
+  (if (gethash "type" table)
+      (parse-table table)
+      (alexandria:hash-table-alist table)))
+
 
 
 ;;; JSON serialization
 ;;; ————————————————————————————————————————
 (defmethod yason:encode ((obj object) &optional (stream *standard-output*))
-  (yason:with-output (stream)
-    (yason:with-object ()
-      (if *@context*
+  (yason:with-object ()
+    (if *@context* ; If this object is nested in another, use old context.
+        (yason:encode-object obj)
+        (let ((*@context* (slot-value obj '@context))) ; Unnested, so create context.
           (yason:encode-object obj)
-          (let ((*@context* (slot-value obj '@context)))
-            (yason:encode-object obj)
-            (yason:encode-object-element
-             "@context"
-             *@context*)))
-      (yason:encode-object-element
-       "type"
-       (or (object-type obj)
-           (class-pretty-name (class-of obj)))))))
+          (yason:encode-object-element
+           "@context"
+           *@context*)))
+    (yason:encode-object-element
+     "type"
+     (or (object-type obj)
+         (class-pretty-name (class-of obj))))))
 
 (defun class-slots-to-camel-cased-strings-alist (class)
   "Return an associative list of a CLASS’es direct slots (by symbol) matched with
