@@ -84,18 +84,13 @@ modified globally (as we expect it to be nil in top-level objects.")
   "Identical to DEFCLASS, but with one convenience: A slot definition, if being
 simply a symbol, will default to a slot with an accessor and init-arg named after the
 symbol. The init-arg will be “:symbol”, and the accessor will be “classname-symbol”.
-For instance,
-
+For example, the following two forms are equivalent:
     (defclass-w-accessors PERSON () (AGE
                                      HEIGHT
                                      (NAME :INIT-FORM “Unknown”)))
-```
-is equivalent to
-```
     (defclass PERSON () ((AGE    :INIT-ARG :AGE    :ACCESSOR PERSON-AGE)
                          (HEIGHT :INIT-ARG :HEIGHT :ACCESSOR PERSON-HEIGHT)
-                         (NAME   :INIT-FORM “Unknown”)))
-```"
+                         (NAME   :INIT-FORM “Unknown”)))"
   `(defclass ,name ,direct-superclasses
      ,(mapcar
        (lambda (slot)
@@ -233,42 +228,6 @@ again and again, by YASON:ENCODE-SLOTS."
 
 
 
-;;; Util
-;;; ————————————————————————————————————————
-(defun camel-case (string)
-  "Convert a STRING to camel-casing.
-Wrapper around STR:CAMEL-CASE, working around a bug that a non-alphanumeric
-character at the start of the string gets erroneously (or at least undesireably,
-to us) removed."
-  (if (not (alphanumericp (aref string 0)))
-      (concatenate 'string
-                   (string (aref string 0))
-                   (str:camel-case string))
-      (str:camel-case string)))
-
-(defun class-pretty-name (class)
-  "Return a CLASS’es name in a “pretty” (sentence-capitalized) string."
-  (string-capitalize (symbol-name (class-name class))))
-
-(defun merge-lists (a b)
-  "Given lists A and B, merge them into one list non-redundantly — all unique
-items in each will be contained in the resultant list."
-  (append a (remove-if (lambda (item) (find item a :test #'equal)) b)))
-
-(defun find-registered-symbols (str)
-  "Find all symbols identified by string STR within packages in the
-*ap-packages* list."
-  (mapcar (lambda (package) (find-symbol (string-upcase str) package))
-          *ap-packages*))
-
-(defun find-registered-classes (str)
-  "Find all classes identified by string STR within pacakges in the
-*ap-packages* list."
-  (mapcar (lambda (sym) (find-class sym))
-          (find-registered-symbols str)))
-
-
-
 ;;; JSON parsing
 ;;; ————————————————————————————————————————
 (defun parse (string)
@@ -348,7 +307,47 @@ containing both of their elements."
           (if (listp a) a (list a))
           (if (listp b) b (list b))))))
 
-;; Ensure all classes have their slots’ encodings defined with YASON.
+
+
+;;; Util
+;;; ————————————————————————————————————————
+(defun camel-case (string)
+  "Convert a STRING to camel-casing.
+Wrapper around STR:CAMEL-CASE, working around a bug that a non-alphanumeric
+character at the start of the string gets erroneously (or at least undesireably,
+to us) removed."
+  (if (not (alphanumericp (aref string 0)))
+      (concatenate 'string
+                   (string (aref string 0))
+                   (str:camel-case string))
+      (str:camel-case string)))
+
+(defun class-pretty-name (class)
+  "Return a CLASS’es name in a “pretty” (sentence-capitalized) string."
+  (string-capitalize (symbol-name (class-name class))))
+
+(defun merge-lists (a b)
+  "Given lists A and B, merge them into one list non-redundantly — all unique
+items in each will be contained in the resultant list."
+  (append a (remove-if (lambda (item) (find item a :test #'equal)) b)))
+
+(defun find-registered-symbols (str)
+  "Find all symbols identified by string STR within packages in the
+*ap-packages* list."
+  (mapcar (lambda (package) (find-symbol (string-upcase str) package))
+          *ap-packages*))
+
+(defun find-registered-classes (str)
+  "Find all classes identified by string STR within pacakges in the
+*ap-packages* list."
+  (mapcar (lambda (sym) (find-class sym))
+          (find-registered-symbols str)))
+
+
+
+;;; Defining YASON:ENCODE-SLOTS
+;;; ————————————————————————————————————————
+;; On-the-fly define YASON:ENCODE for each of our distinct AP classes.
 (mapcar (lambda (class)
           (closer-mop:finalize-inheritance class)
           (eval `(define-yason-encode-slots ,class)))
