@@ -55,6 +55,17 @@
 
 (in-package #:activitypub-servist/activity-vocabulary)
 
+
+
+;;; Globals
+;;; ————————————————————————————————————————
+;; Used in YASON:ENCODE to ensure that a single top-level @context can be
+;; created where AP objects contain other AP objects in their slots.
+;; This variable is overridden locally (LET), and should never be
+;; modified globally (as we expect it to be nil in top-level objects).
+(defparameter *@context* nil)
+
+
 
 ;;; Macros
 ;;; ————————————————————————————————————————
@@ -95,16 +106,24 @@ of NAME."
              `(defclass ,a (,name) ()))
            direct-children)))
 
-(defmacro define-yason-encode-slots-to-camel-cased-keys (class)
+(defmacro define-yason-encode-slots (class)
   "Define a YASON:ENCODE-SLOTS method for a CLASS, which simply encodes all of
 CLASS’es slots with JSON keys based on the camel-cased slot name."
   (append
    `(defmethod yason:encode-slots progn ((obj ,class)))
-   (mapcar (lambda (slot-key-pair)
-             `(let ((value (slot-value obj ',(car slot-key-pair))))
-                (when value
-                  (yason:encode-object-element ,(cdr slot-key-pair) value))))
-      (class-slots-to-camel-cased-strings-alist class))))
+   (mapcar (yason-encode-slot-function)
+           (class-slots-to-camel-cased-strings-alist class))))
+
+(defun yason-encode-slot-function ()
+  "Helper-function for the DEFINE-YASON-ENCODE-SLOTS macro.
+This returns a function to create a quoted function that should be called for each slot,
+again and again, by YASON:ENCODE-SLOTS."
+  (lambda (slot-key-pair)
+    `(let ((value (slot-value obj ',(car slot-key-pair))))
+       (cond ((eq ',(car slot-key-pair) '@context)
+              (setq *@context* (merge-@contexts *@context* value)))
+             (value
+              (yason:encode-object-element ,(cdr slot-key-pair) value))))))
 
 
 
@@ -203,38 +222,8 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
 
 
 
-;;; JSON serialization
-;;; ————————————————————————————————————————
-(defmethod yason:encode ((obj object) &optional (stream *standard-output*))
-  (yason:with-output (stream)
-    (yason:with-object ()
-      (yason:encode-object obj)
-      (yason:encode-object-element
-       "type"
-       (or (object-type obj)
-           (class-pretty-name (class-of obj)))))))
-
-;; Ensure all classes have their slots’ encodings defined with YASON.
-(mapcar (lambda (class)
-          (closer-mop:finalize-inheritance class)
-          (eval `(define-yason-encode-slots-to-camel-cased-keys ,class)))
-        (mapcar #'find-class
-                '(object link activity collection collection-page
-                  ordered-collection-page place profile relationship tombstone)))
-
-
-
 ;;; Util
 ;;; ————————————————————————————————————————
-(defun class-slots-to-camel-cased-strings-alist (class)
-  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
-their names in camel-case format."
-  (mapcar
-   (lambda (slot)
-     (let ((name (closer-mop:slot-definition-name slot)))
-      (cons name (camel-case (symbol-name name)))))
-   (closer-mop:class-direct-slots class)))
-
 (defun camel-case (string)
   "Convert a STRING to camel-casing.
 Wrapper around STR:CAMEL-CASE, working around a bug that a non-alphanumeric
@@ -249,3 +238,58 @@ to us) removed."
 (defun class-pretty-name (class)
   "Return a CLASS’es name in a “pretty” (sentence-capitalized) string."
   (string-capitalize (symbol-name (class-name class))))
+
+(defun merge-lists (a b)
+  "Given lists A and B, merge them into one list non-redundantly — all unique
+items in each will be contained in the resultant list."
+  (append a (remove-if (lambda (item) (find item a :test #'equal)) b)))
+
+
+
+;;; JSON serialization
+;;; ————————————————————————————————————————
+(defmethod yason:encode ((obj object) &optional (stream *standard-output*))
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (if *@context*
+          (yason:encode-object obj)
+          (let ((*@context* (slot-value obj '@context)))
+            (yason:encode-object obj)
+            (yason:encode-object-element
+             "@context"
+             *@context*)))
+      (yason:encode-object-element
+       "type"
+       (or (object-type obj)
+           (class-pretty-name (class-of obj)))))))
+
+(defun class-slots-to-camel-cased-strings-alist (class)
+  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
+their names in camel-case format."
+  (mapcar
+   (lambda (slot)
+     (let ((name (closer-mop:slot-definition-name slot)))
+      (cons name (camel-case (symbol-name name)))))
+   (closer-mop:class-direct-slots class)))
+
+(defun merge-@contexts (a b)
+  "Given two @context lists, A and B, merge them into one JSON-LD @context list
+containing both of their elements."
+  (cond ((equal a b) a)
+        ((not b)     a)
+        ((not a)     b)
+        ((and (listp a)
+              (find b a :test #'equal))
+         a)
+        (T
+         (merge-lists
+          (if (listp a) a (list a))
+          (if (listp b) b (list b))))))
+
+;; Ensure all classes have their slots’ encodings defined with YASON.
+(mapcar (lambda (class)
+          (closer-mop:finalize-inheritance class)
+          (eval `(define-yason-encode-slots ,class)))
+        (mapcar #'find-class
+                '(object link activity collection collection-page
+                  ordered-collection-page place profile relationship tombstone)))
