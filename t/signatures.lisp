@@ -1,6 +1,6 @@
 ;;;; activitypub-servist/tests/signatures: Testing activitypub-servist/signatures.
 
-;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
+;; Copyright © 2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU Affero General Public License

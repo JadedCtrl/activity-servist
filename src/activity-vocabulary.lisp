@@ -36,6 +36,7 @@
    :tentative-accept :tentative-reject :tombstone :travel :undo :update :video
    :view
    ;; Slots
+   :@context :type
    :activity-actor :activity-instrument :activity-object :activity-origin
    :activity-result :activity-target
    :collection-current :collection-first :collection-items :collection-last
@@ -112,22 +113,29 @@ of NAME."
              `(defclass ,a (,name) ()))
            direct-children)))
 
+;; This macro and the following function are related to JSON serialization; see
+;; the below “JSON serialization” section for other related functions.
 (defmacro define-yason-encode-slots (class)
   "Define a YASON:ENCODE-SLOTS method for a CLASS, which simply encodes all of
 CLASS’es slots with JSON keys based on the camel-cased slot name."
   (append
    `(defmethod yason:encode-slots progn ((obj ,class)))
    (mapcar (yason-encode-slot-function)
-           (class-slots-to-camel-cased-strings-alist class))))
+           (class-slots-activity-alist class))))
 
 (defun yason-encode-slot-function ()
   "Helper-function for the DEFINE-YASON-ENCODE-SLOTS macro.
 This returns a function to create a quoted function that should be called for each slot,
 again and again, by YASON:ENCODE-SLOTS."
   (lambda (slot-key-pair)
-    `(let ((value (slot-value obj ',(car slot-key-pair))))
-       (cond ((eq ',(car slot-key-pair) '@context)
+    `(let ((key ',(car slot-key-pair))
+           (value (slot-value obj ',(car slot-key-pair))))
+       (cond ((eq key '@context) ; Encoded in YASON:ENCODE-OBJECT using *@context*
               (setq *@context* (merge-@contexts *@context* value)))
+             ((eq key 'type)     ; Encode type based on class-name or TYPE slot
+              (yason:encode-object-element
+               "type" (or value
+                          (class-pretty-name (class-of obj)))))
              (value
               (yason:encode-object-element ,(cdr slot-key-pair) value))))))
 
@@ -270,28 +278,33 @@ into one. Otherwise, parse it into an associative list."
 
 ;;; JSON serialization
 ;;; ————————————————————————————————————————
+;; Note-worthy: See the above-defined DEFINE-YASON-ENCODE-SLOTS.
 (defmethod yason:encode ((obj object) &optional (stream *standard-output*))
-  (yason:with-object ()
-    (if *@context* ; If this object is nested in another, use old context.
-        (yason:encode-object obj)
-        (let ((*@context* (slot-value obj '@context))) ; Unnested, so create context.
-          (yason:encode-object obj)
-          (yason:encode-object-element
-           "@context"
-           *@context*)))
-    (yason:encode-object-element
-     "type"
-     (or (object-type obj)
-         (class-pretty-name (class-of obj))))))
+  (yason:encode-object obj))
 
-(defun class-slots-to-camel-cased-strings-alist (class)
-  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
-their names in camel-case format."
-  (mapcar
-   (lambda (slot)
-     (let ((name (closer-mop:slot-definition-name slot)))
-      (cons name (camel-case (symbol-name name)))))
-   (closer-mop:class-direct-slots class)))
+(defmethod yason:encode-object ((obj object))
+  (typecase *@context*
+    (null ; If this is the top-level (non-nested) object, establish a @context.
+     (let ((*@context* 'top-level))
+       (yason:encode-object obj)))
+    (symbol ; In the top-level, encode slots and then @context.
+     (setq *@context* (slot-value obj '@context))
+     (yason:with-object ()
+       (yason:encode-slots obj)
+       (yason:encode-object-element "@context" *@context*)))
+    (T ; In nested objects, only encode slots — not *@context*.
+     (yason:with-object ()
+       (yason:encode-slots obj)))))
+
+(defun class-slots-activity-alist (class)
+  "Return an associative list containing CLASSes slots’ symbols consed with
+their sanitized string keys appropriate for ActivityVocabular custom.
+A class with slots MAP-AWAY and COLLECTION-AGAIN would return
+  ((MAP-AWAY . “mapAway”)(COLLECTION-AGAIN . “collectionAgain”))"
+;;  (alist-remove-keys
+;;   'type
+   (alist-mapcdr #'camel-case
+                 (class-slots-alist class)))
 
 (defun merge-@contexts (a b)
   "Given two @context lists, A and B, merge them into one JSON-LD @context list
@@ -343,11 +356,37 @@ items in each will be contained in the resultant list."
   (mapcar (lambda (sym) (find-class sym))
           (find-registered-symbols str)))
 
+(defun alist-remove-keys (item alist &optional (test #'equal))
+  "Remove cells from an associative list whose key TESTs as ITEM."
+  (cl:remove item alist
+             :test (lambda (a cell)
+                     (funcall test a (car cell)))))
+
+(defun alist-mapcdr (function alist)
+  "Apply a FUNCTION to all values (cdrs) of an ALIST’s pairs. Returns a new ALIST
+of the same keys, whose values are the results of FUNCTION."
+  (mapcar
+   (lambda (cell)
+     (cons (car cell)
+           (funcall function (cdr cell))))
+   alist))
+
+(defun class-slots-alist (class)
+  "Return an associative list of a CLASS’es direct slots (by symbol) matched with
+their names as strings. For instance, a class with slots MAP-AWAY and
+COLLECTION-AGAIN would return:
+  ((MAP-AWAY . “MAP-AWAY”)(COLLECTION-AGAIN . “COLLECTION-AGAIN”)"
+  (mapcar
+   (lambda (slot)
+     (let ((name (closer-mop:slot-definition-name slot)))
+      (cons name (symbol-name name))))
+   (closer-mop:class-direct-slots class)))
+
 
 
 ;;; Defining YASON:ENCODE-SLOTS
 ;;; ————————————————————————————————————————
-;; On-the-fly define YASON:ENCODE for each of our distinct AP classes.
+;; On-the-fly define YASON:ENCODE-SLOTS for each of our distinct AP classes.
 (mapcar (lambda (class)
           (closer-mop:finalize-inheritance class)
           (eval `(define-yason-encode-slots ,class)))
