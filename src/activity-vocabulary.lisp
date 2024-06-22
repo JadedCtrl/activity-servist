@@ -128,7 +128,7 @@ CLASS’es slots with JSON keys based on the camel-cased slot name."
 This returns a function to create a quoted function that should be called for each slot,
 again and again, by YASON:ENCODE-SLOTS."
   (lambda (slot-key-pair)
-    `(let ((key ',(car slot-key-pair))
+    `(let ((key   ',(car slot-key-pair))
            (value (slot-value obj ',(car slot-key-pair))))
        (cond ((eq key '@context) ; Encoded in YASON:ENCODE-OBJECT using *@context*
               (setq *@context* (merge-@contexts *@context* value)))
@@ -280,19 +280,20 @@ into one. Otherwise, parse it into an associative list."
 ;;; ————————————————————————————————————————
 ;; Note-worthy: See the above-defined DEFINE-YASON-ENCODE-SLOTS.
 (defmethod yason:encode ((obj object) &optional (stream *standard-output*))
-  (yason:encode-object obj))
+  (yason:with-output (stream)
+    (yason:encode-object obj)))
 
 (defmethod yason:encode-object ((obj object))
   (typecase *@context*
-    (null ; If this is the top-level (non-nested) object, establish a @context.
+    (null   ; If this is the top-level (non-nested) object, establish a @context.
      (let ((*@context* 'top-level))
        (yason:encode-object obj)))
     (symbol ; In the top-level, encode slots and then @context.
      (setq *@context* (slot-value obj '@context))
      (yason:with-object ()
-       (yason:encode-slots obj)
-       (yason:encode-object-element "@context" *@context*)))
-    (T ; In nested objects, only encode slots — not *@context*.
+      (yason:encode-slots obj)
+      (yason:encode-object-element "@context" *@context*)))
+    (T      ; In nested objects, only encode slots — not *@context*.
      (yason:with-object ()
        (yason:encode-slots obj)))))
 
