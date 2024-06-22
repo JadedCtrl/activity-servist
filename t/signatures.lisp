@@ -16,11 +16,21 @@
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 (defpackage :activitypub-servist/tests/signatures
-  (:use :cl :lisp-unit2))
+  (:use :cl :lisp-unit2)
+  (:nicknames "AP-S/T/S")
+  (:export :run))
 
 (in-package :activitypub-servist/tests/signatures)
 
+(defun run ()
+  "Run all SIGNATURES tests."
+  (lisp-unit2:with-summary ()
+    (lisp-unit2:run-tests :package :activitypub-servist/tests/signatures)))
 
+
+
+;;; Test definitions
+;;; ————————————————————————————————————————
 (define-test string-sha256sum (:tags '(misc))
   (assert-equal
    "erws/VxJ7XO5xQBqpwHIUwG0P4q1Ek2D4N053+E2Ib8="
