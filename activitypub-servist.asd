@@ -8,6 +8,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
 
+  :in-order-to ((test-op (test-op "activitypub/tests")))
   :depends-on ("activitypub-servist/signatures"
                "alexandria" "clack" "dexador"
                "local-time"  "purl" "str" "webtentacle" "yason")
@@ -21,6 +22,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
 
+  :in-order-to ((test-op (test-op "activitypub/tests/activity-vocabulary")))
   :depends-on ("alexandria" "closer-mop" "str" "yason")
   :components ((:file "src/activity-vocabulary")))
 
@@ -32,6 +34,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
 
+  :in-order-to ((test-op (test-op "activitypub/tests/signatures")))
   :depends-on ("cl-base64" "flexi-streams" "inferior-shell" "ironclad" "str")
   :components ((:file "src/signatures")))
 
@@ -59,10 +62,23 @@
   :components ((:file "t/signatures")))
 
 
+(asdf:defsystem "activitypub-servist/tests"
+  :version "0.0"
+  :license "AGPLv3"
+  :author "Jaidyn Ann <jadedctrl@posteo.at>"
+  :description "Tests for all activitypub-servist subpacakges."
+
+  :depends-on (:activitypub-servist/tests/activity-vocabulary
+               :activitypub-servist/tests/signatures
+               :alexandria :lisp-unit2)
+  :components ((:file "t/t")))
+
 ;; Following method tweaked from lisp-unit2’s documentation:
 ;; https://github.com/AccelerationNet/lisp-unit2/blob/master/README.md#asdf
-(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :activitypub-servist/tests/activity-vocabulary))))
-  (eval (read-from-string "(activtiypub-servist/tests/activity-vocabulary:run)")))
+(defmacro define-asdf-testing (package)
+  `(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system ',package))))
+     (eval (read-from-string (format nil "(~A:run-with-summary)" ',package)))))
 
-(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :activitypub-servist/tests/signatures))))
-  (eval (read-from-string "(activtiypub-servist/tests/signatures:run)")))
+(define-asdf-testing activitypub-servist/tests/activity-vocabulary)
+(define-asdf-testing activitypub-servist/tests/signatures)
+(define-asdf-testing activitypub-servist/tests)

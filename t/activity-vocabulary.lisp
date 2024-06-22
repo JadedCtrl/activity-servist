@@ -18,14 +18,18 @@
 (defpackage :activitypub-servist/tests/activity-vocabulary
   (:use :cl :lisp-unit2)
   (:nicknames "AP-S/T/AV")
-  (:export :run))
+  (:export :run :run-with-summary))
 
 (in-package :activitypub-servist/tests/activity-vocabulary)
 
 (defun run ()
   "Run all ACTIVITY-VOCABULARY tests."
-  (lisp-unit2:with-summary ()
-    (lisp-unit2:run-tests :package :activitypub-servist/tests/activity-vocabulary)))
+  (lisp-unit2:run-tests :package :activitypub-servist/tests/activity-vocabulary))
+
+(defun run-with-summary ()
+  "Run tests with summary for ACTIVITY-VOCABULARY."
+  (lisp-unit2:with-summary()
+    (run)))
 
 
 

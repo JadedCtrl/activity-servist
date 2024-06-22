@@ -18,14 +18,18 @@
 (defpackage :activitypub-servist/tests/signatures
   (:use :cl :lisp-unit2)
   (:nicknames "AP-S/T/S")
-  (:export :run))
+  (:export :run :run-with-summary))
 
 (in-package :activitypub-servist/tests/signatures)
 
 (defun run ()
   "Run all SIGNATURES tests."
-  (lisp-unit2:with-summary ()
-    (lisp-unit2:run-tests :package :activitypub-servist/tests/signatures)))
+  (lisp-unit2:run-tests :package :activitypub-servist/tests/signatures))
+
+(defun run-with-summary ()
+  "Run tests with summary for SIGNATURES."
+  (lisp-unit2:with-summary()
+    (run)))
 
 
 
