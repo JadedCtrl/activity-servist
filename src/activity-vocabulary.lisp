@@ -301,10 +301,8 @@ into one. Otherwise, parse it into an associative list."
 their sanitized string keys appropriate for ActivityVocabular custom.
 A class with slots MAP-AWAY and COLLECTION-AGAIN would return
   ((MAP-AWAY . “mapAway”)(COLLECTION-AGAIN . “collectionAgain”))"
-;;  (alist-remove-keys
-;;   'type
-   (alist-mapcdr #'camel-case
-                 (class-slots-alist class)))
+  (alist-mapcdr #'camel-case
+                (class-slots-alist class)))
 
 (defun merge-@contexts (a b)
   "Given two @context lists, A and B, merge them into one JSON-LD @context list
@@ -355,12 +353,6 @@ items in each will be contained in the resultant list."
 *ap-packages* list."
   (mapcar (lambda (sym) (find-class sym))
           (find-registered-symbols str)))
-
-(defun alist-remove-keys (item alist &optional (test #'equal))
-  "Remove cells from an associative list whose key TESTs as ITEM."
-  (cl:remove item alist
-             :test (lambda (a cell)
-                     (funcall test a (car cell)))))
 
 (defun alist-mapcdr (function alist)
   "Apply a FUNCTION to all values (cdrs) of an ALIST’s pairs. Returns a new ALIST
