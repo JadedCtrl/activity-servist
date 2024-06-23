@@ -15,26 +15,25 @@
   :components ((:file "src/activity-servist")))
 
 
-(asdf:defsystem "activity-servist/activity-vocabulary"
+(asdf:defsystem "activity-servist/activity-streams"
   :version "0.0"
   :license "AGPLv3"
-  :description "AP-S subpackage for handling ActivityVocabulary parsing/encoding."
+  :description "A-S subpackage for handling ActivityStreams parsing/encoding."
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :in-order-to ((test-op (test-op "activitypub/tests/activity-vocabulary")))
   :depends-on ("alexandria" "closer-mop" "str" "yason")
-  :components ((:file "src/activity-vocabulary")))
+  :components ((:file "src/activity-streams")
+               (:file "src/activity-vocabulary")))
 
 
 (asdf:defsystem "activity-servist/signatures"
   :version "0.0"
   :license "AGPLv3"
-  :description "AP-S subpackage for handling HTTP signatures."
+  :description "A-S subpackage for handling HTTP signatures."
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :in-order-to ((test-op (test-op "activitypub/tests/signatures")))
   :depends-on ("cl-base64" "flexi-streams" "inferior-shell" "ironclad" "str")
   :components ((:file "src/signatures")))
 
@@ -42,14 +41,14 @@
 
 ;;; Tests
 ;;; —————————————————————————————————————
-(asdf:defsystem "activity-servist/tests/activity-vocabulary"
+(asdf:defsystem "activity-servist/tests/activity-streams"
   :version "0.0"
   :license "AGPLv3"
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for the the activity-servist/signatures package."
+  :description "Tests for the the activity-servist/activity-streams package."
 
-  :depends-on (:activity-servist/activity-vocabulary :alexandria :lisp-unit2)
-  :components ((:file "t/activity-vocabulary")))
+  :depends-on (:activity-servist/activity-streams :alexandria :lisp-unit2)
+  :components ((:file "t/activity-streams")))
 
 
 (asdf:defsystem "activity-servist/tests/signatures"
@@ -68,7 +67,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :description "Tests for all activity-servist subpacakges."
 
-  :depends-on (:activity-servist/tests/activity-vocabulary
+  :depends-on (:activity-servist/tests/activity-streams
                :activity-servist/tests/signatures
                :alexandria :lisp-unit2)
   :components ((:file "t/t")))
@@ -79,6 +78,6 @@
   `(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system ',package))))
      (eval (read-from-string (format nil "(~A:run-with-summary)" ',package)))))
 
-(define-asdf-testing activity-servist/tests/activity-vocabulary)
+(define-asdf-testing activity-servist/tests/activity-streams)
 (define-asdf-testing activity-servist/tests/signatures)
 (define-asdf-testing activity-servist/tests)

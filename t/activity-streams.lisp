@@ -1,4 +1,4 @@
-;;;; activity-servist/tests/activity-vocabulary: Testing activity-vocabulary.
+;;;; activity-servist/tests/activity-streams: Testing activity-streams.
 
 ;; Copyright © 2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,19 +15,19 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage :activity-servist/tests/activity-vocabulary
+(defpackage :activity-servist/tests/activity-streams
   (:use :cl :lisp-unit2)
-  (:nicknames "AS/T/AV")
+  (:nicknames "AS/T/AS")
   (:export :run :run-with-summary))
 
-(in-package :activity-servist/tests/activity-vocabulary)
+(in-package :activity-servist/tests/activity-streams)
 
 (defun run ()
-  "Run all ACTIVITY-VOCABULARY tests."
-  (lisp-unit2:run-tests :package :activity-servist/tests/activity-vocabulary))
+  "Run all ACTIVITY-STREAMS tests."
+  (lisp-unit2:run-tests :package :activity-servist/tests/activity-streams))
 
 (defun run-with-summary ()
-  "Run tests with summary for ACTIVITY-VOCABULARY."
+  "Run tests with summary for ACTIVITY-STREAMS."
   (lisp-unit2:with-summary()
     (run)))
 
@@ -37,7 +37,7 @@
 ;;; ————————————————————————————————————————
 (defmacro relative-pathname (path)
   "Return an absolute path adding the relative PATH to the system’s path."
-  `(asdf:system-relative-pathname :activity-servist/tests/activity-vocabulary ,path))
+  `(asdf:system-relative-pathname :activity-servist/tests/activity-streams ,path))
 
 (defmacro define-json-test (path tags)
   "Define a lisp-unit2 test for parsing of the given JSON file.
@@ -52,7 +52,7 @@ ensuring they are semantically equivalent. White-space and key order are ignored
          (yason:parse
           (yason:with-output-to-string* ()
             (yason:encode-object
-             (as/av:parse ,content)))))))))
+             (as/as:parse ,content)))))))))
 
 (defun sort-alist (alist predicate)
   "Sort an associative list by its keys."
@@ -88,6 +88,6 @@ Any nested hash-tables found as values are also sorted, recursively."
 ;; Examples are taken from the spec:
 ;;   https://www.w3.org/TR/activitystreams-vocabulary/
 (mapcar (lambda (file)
-          (eval `(define-json-test ,file '(:core))))
+          (eval `(define-json-test ,file '(:activity-vocabulary))))
         (uiop:directory-files
-         (relative-pathname "t/activity-vocabulary/core/")))
+         (relative-pathname "t/activity-streams/activity-vocabulary/")))
