@@ -1,4 +1,4 @@
-;;;; activitypub-servist: An ActivityPub server framework.
+;;;; activity-servist: An ActivityPub server framework.
 
 ;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,12 +15,12 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage #:activitypub-servist
-  (:use #:cl #:activitypub-servist/signatures)
-  (:nicknames "AP-S")
+(defpackage #:activity-servist
+  (:use #:cl #:activity-servist/signatures)
+  (:nicknames "AS")
   (:export :server :start-server))
 
-(in-package #:activitypub-servist)
+(in-package #:activity-servist)
 
 
 (defun users ()
@@ -146,7 +146,7 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
          ("inbox" . ,(str:concat user-root "/inbox"))
          ("outbox" . ,(str:concat user-root  "/outbox"))
          ("discoverable" . t)
-         ("summary" . "Mi estas simpla roboto, kiu montras ke iomete ekfunkcias activitypub-servist.
+         ("summary" . "Mi estas simpla roboto, kiu montras ke iomete ekfunkcias activity-servist.
 … ĉu mi rajtas demeti la servistinan kostumon, nun?
 Mi ne estas knabino!!")
          ("icon"

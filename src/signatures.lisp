@@ -1,4 +1,4 @@
-;;;; activitypub-servist/signatures: Handle AP-compatible HTTP signatures.
+;;;; activity-servist/signatures: Handle AP-compatible HTTP signatures.
 
 ;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,14 +15,14 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage #:activitypub-servist/signatures
+(defpackage #:activity-servist/signatures
   (:use #:cl)
-  (:nicknames "AP-S/S")
+  (:nicknames "AS/S")
   (:export :generate-key-pair
            :sign-string :import-pem-key-pair
            :digest-string :string-sha256sum))
 
-(in-package #:activitypub-servist/signatures)
+(in-package #:activity-servist/signatures)
 
 
 ;;; Key creation/parsing

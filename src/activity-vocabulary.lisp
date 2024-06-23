@@ -15,9 +15,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage #:activitypub-servist/activity-vocabulary
+(defpackage #:activity-servist/activity-vocabulary
   (:use #:cl)
-  (:nicknames "AP-S/AV" "AV")
+  (:nicknames "AS/AV" "ACTIVITY-VOCABULARY")
   (:shadow #:delete #:ignore #:listen #:read #:remove)
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
@@ -58,7 +58,7 @@
    :relationship-object :relationship-relationship :relationship-subject
    :tombstone-former-type :tombstone-deleted))
 
-(in-package #:activitypub-servist/activity-vocabulary)
+(in-package #:activity-servist/activity-vocabulary)
 
 
 

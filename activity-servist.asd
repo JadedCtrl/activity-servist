@@ -1,38 +1,38 @@
 (require "asdf")
 
 
-(asdf:defsystem "activitypub-servist"
+(asdf:defsystem "activity-servist"
   :version "0.0"
   :license "AGPLv3"
   :description "ActitivyPub federated server framework."
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
+  :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
   :in-order-to ((test-op (test-op "activitypub/tests")))
-  :depends-on ("activitypub-servist/signatures"
+  :depends-on ("activity-servist/signatures"
                "alexandria" "clack" "dexador"
                "local-time"  "purl" "str" "webtentacle" "yason")
-  :components ((:file "src/activitypub-servist")))
+  :components ((:file "src/activity-servist")))
 
 
-(asdf:defsystem "activitypub-servist/activity-vocabulary"
+(asdf:defsystem "activity-servist/activity-vocabulary"
   :version "0.0"
   :license "AGPLv3"
   :description "AP-S subpackage for handling ActivityVocabulary parsing/encoding."
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
+  :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
   :in-order-to ((test-op (test-op "activitypub/tests/activity-vocabulary")))
   :depends-on ("alexandria" "closer-mop" "str" "yason")
   :components ((:file "src/activity-vocabulary")))
 
 
-(asdf:defsystem "activitypub-servist/signatures"
+(asdf:defsystem "activity-servist/signatures"
   :version "0.0"
   :license "AGPLv3"
   :description "AP-S subpackage for handling HTTP signatures."
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :homepage "https://hak.xwx.moe/jadedctrl/activitypub-servist"
+  :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
   :in-order-to ((test-op (test-op "activitypub/tests/signatures")))
   :depends-on ("cl-base64" "flexi-streams" "inferior-shell" "ironclad" "str")
@@ -42,34 +42,34 @@
 
 ;;; Tests
 ;;; —————————————————————————————————————
-(asdf:defsystem "activitypub-servist/tests/activity-vocabulary"
+(asdf:defsystem "activity-servist/tests/activity-vocabulary"
   :version "0.0"
   :license "AGPLv3"
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for the the activitypub-servist/signatures package."
+  :description "Tests for the the activity-servist/signatures package."
 
-  :depends-on (:activitypub-servist/activity-vocabulary :alexandria :lisp-unit2)
+  :depends-on (:activity-servist/activity-vocabulary :alexandria :lisp-unit2)
   :components ((:file "t/activity-vocabulary")))
 
 
-(asdf:defsystem "activitypub-servist/tests/signatures"
+(asdf:defsystem "activity-servist/tests/signatures"
   :version "0.0"
   :license "AGPLv3"
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for the the activitypub-servist/signatures package."
+  :description "Tests for the the activity-servist/signatures package."
 
-  :depends-on (:activitypub-servist/signatures :lisp-unit2)
+  :depends-on (:activity-servist/signatures :lisp-unit2)
   :components ((:file "t/signatures")))
 
 
-(asdf:defsystem "activitypub-servist/tests"
+(asdf:defsystem "activity-servist/tests"
   :version "0.0"
   :license "AGPLv3"
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for all activitypub-servist subpacakges."
+  :description "Tests for all activity-servist subpacakges."
 
-  :depends-on (:activitypub-servist/tests/activity-vocabulary
-               :activitypub-servist/tests/signatures
+  :depends-on (:activity-servist/tests/activity-vocabulary
+               :activity-servist/tests/signatures
                :alexandria :lisp-unit2)
   :components ((:file "t/t")))
 
@@ -79,6 +79,6 @@
   `(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system ',package))))
      (eval (read-from-string (format nil "(~A:run-with-summary)" ',package)))))
 
-(define-asdf-testing activitypub-servist/tests/activity-vocabulary)
-(define-asdf-testing activitypub-servist/tests/signatures)
-(define-asdf-testing activitypub-servist/tests)
+(define-asdf-testing activity-servist/tests/activity-vocabulary)
+(define-asdf-testing activity-servist/tests/signatures)
+(define-asdf-testing activity-servist/tests)

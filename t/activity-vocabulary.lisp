@@ -1,4 +1,4 @@
-;;;; activitypub-servist/tests/activity-vocabulary: Testing activity-vocabulary.
+;;;; activity-servist/tests/activity-vocabulary: Testing activity-vocabulary.
 
 ;; Copyright © 2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,16 +15,16 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage :activitypub-servist/tests/activity-vocabulary
+(defpackage :activity-servist/tests/activity-vocabulary
   (:use :cl :lisp-unit2)
-  (:nicknames "AP-S/T/AV")
+  (:nicknames "AS/T/AV")
   (:export :run :run-with-summary))
 
-(in-package :activitypub-servist/tests/activity-vocabulary)
+(in-package :activity-servist/tests/activity-vocabulary)
 
 (defun run ()
   "Run all ACTIVITY-VOCABULARY tests."
-  (lisp-unit2:run-tests :package :activitypub-servist/tests/activity-vocabulary))
+  (lisp-unit2:run-tests :package :activity-servist/tests/activity-vocabulary))
 
 (defun run-with-summary ()
   "Run tests with summary for ACTIVITY-VOCABULARY."
@@ -37,7 +37,7 @@
 ;;; ————————————————————————————————————————
 (defmacro relative-pathname (path)
   "Return an absolute path adding the relative PATH to the system’s path."
-  `(asdf:system-relative-pathname :activitypub-servist/tests/activity-vocabulary ,path))
+  `(asdf:system-relative-pathname :activity-servist/tests/activity-vocabulary ,path))
 
 (defmacro define-json-test (path tags)
   "Define a lisp-unit2 test for parsing of the given JSON file.
@@ -52,7 +52,7 @@ ensuring they are semantically equivalent. White-space and key order are ignored
          (yason:parse
           (yason:with-output-to-string* ()
             (yason:encode-object
-             (av:parse ,content)))))))))
+             (as/av:parse ,content)))))))))
 
 (defun sort-alist (alist predicate)
   "Sort an associative list by its keys."

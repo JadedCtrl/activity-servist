@@ -1,4 +1,4 @@
-;;;; activitypub-servist/tests/signatures: Testing activitypub-servist/signatures.
+;;;; activity-servist/tests/signatures: Testing activity-servist/signatures.
 
 ;; Copyright © 2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,16 +15,16 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage :activitypub-servist/tests/signatures
+(defpackage :activity-servist/tests/signatures
   (:use :cl :lisp-unit2)
-  (:nicknames "AP-S/T/S")
+  (:nicknames "AS/T/S")
   (:export :run :run-with-summary))
 
-(in-package :activitypub-servist/tests/signatures)
+(in-package :activity-servist/tests/signatures)
 
 (defun run ()
   "Run all SIGNATURES tests."
-  (lisp-unit2:run-tests :package :activitypub-servist/tests/signatures))
+  (lisp-unit2:run-tests :package :activity-servist/tests/signatures))
 
 (defun run-with-summary ()
   "Run tests with summary for SIGNATURES."
@@ -38,4 +38,4 @@
 (define-test string-sha256sum (:tags '(misc))
   (assert-equal
    "erws/VxJ7XO5xQBqpwHIUwG0P4q1Ek2D4N053+E2Ib8="
-   (ap-s/s::string-sha256sum "This is a testing string~! ♥ ĉu ne?~")))
+   (as/s::string-sha256sum "This is a testing string~! ♥ ĉu ne?~")))
