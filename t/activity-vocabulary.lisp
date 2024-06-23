@@ -60,15 +60,23 @@ ensuring they are semantically equivalent. White-space and key order are ignored
         (lambda (cell-a cell-b)
           (apply predicate (list (car cell-a) (car cell-b))))))
 
+(defun ensure-list (item)
+  "Ensure ITEM is either a list or the sole member of a new list."
+  (if (listp item)
+      item
+      (list item)))
+
 (defun hash-table-sorted-alist (table &optional (predicate #'string<))
   "Return a sorted associative list containing the keys and values of TABLE.
 Any nested hash-tables found as values are also sorted, recursively."
   (sort-alist
    (mapcar (lambda (cell)
              (cons (car cell)
-                   (if (hash-table-p (cdr cell))
-                       (hash-table-sorted-alist (cdr cell))
-                       (cdr cell))))
+                   (mapcar (lambda (cell-item)
+                             (if (hash-table-p cell-item)
+                                 (hash-table-sorted-alist cell-item)
+                                 cell-item))
+                           (ensure-list (cdr cell)))))
            (alexandria:hash-table-alist table))
    predicate))
 
