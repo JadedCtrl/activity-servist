@@ -143,17 +143,20 @@ again and again, by YASON:ENCODE-SLOTS."
 
 ;;; Core types
 ;;; ————————————————————————————————————————
+(defclass as-object ()
+  ((@context :initform "https://www.w3.org/ns/activitystreams")
+   (type     :accessor object-type)))
+
 ;; https://www.w3.org/ns/activitystreams#Object
-(defclass-w-accessors object ()
+(defclass-w-accessors object (as-object)
   (
    attachment attributed-to audience bcc bto cc content context
    duration end-time generator icon id image in-reply-to location
    media-type name preview published replies start-time summary
-   tag to type updated url
-   (@context :initform "https://www.w3.org/ns/activitystreams")))
+   tag to updated url))
 
 ;; https://www.w3.org/ns/activitystreams#Link
-(defclass-w-accessors link ()
+(defclass-w-accessors link (as-object)
   (height href hreflang media-type name preview rel width))
 
 ;; https://www.w3.org/ns/activitystreams#Activity
@@ -169,14 +172,17 @@ again and again, by YASON:ENCODE-SLOTS."
   (current first items last total-items))
 
 ;; https://www.w3.org/ns/activitystreams#OrderedCollection
-(defclass ordered-collection (collection) ())
+;; Funnily enough, “orderedItems” is actually a ghost! It’s only *implied*. :-P
+;; https://jam.xwx.moe/notice/AjE1LkpLoBvWmDUmK8
+(defclass-w-accessors ordered-collection (collection)
+  (ordered-items))
 
 ;; https://www.w3.org/ns/activitystreams#CollectionPage
 (defclass-w-accessors collection-page (collection)
   (next part-of prev))
 
 ;; https://www.w3.org/ns/activitystreams#OrderedCollectionPage
-(defclass-w-accessors ordered-collection-page (collection-page)
+(defclass-w-accessors ordered-collection-page (collection-page ordered-collection)
   (start-index))
 
 
@@ -279,11 +285,11 @@ into one. Otherwise, parse it into an associative list."
 ;;; JSON serialization
 ;;; ————————————————————————————————————————
 ;; Note-worthy: See the above-defined DEFINE-YASON-ENCODE-SLOTS.
-(defmethod yason:encode ((obj object) &optional (stream *standard-output*))
+(defmethod yason:encode ((obj as-object) &optional (stream *standard-output*))
   (yason:with-output (stream)
     (yason:encode-object obj)))
 
-(defmethod yason:encode-object ((obj object))
+(defmethod yason:encode-object ((obj as-object))
   (typecase *@context*
     (null   ; If this is the top-level (non-nested) object, establish a @context.
      (let ((*@context* 'top-level))
@@ -404,5 +410,6 @@ COLLECTION-AGAIN would return:
           (closer-mop:finalize-inheritance class)
           (eval `(define-yason-encode-slots ,class)))
         (mapcar #'find-class
-                '(object link activity collection collection-page
-                  ordered-collection-page place profile relationship tombstone)))
+                '(as-object object link activity collection collection-page
+                  ordered-collection ordered-collection-page place profile
+                  relationship tombstone)))
