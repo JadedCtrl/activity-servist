@@ -129,7 +129,7 @@ This returns a function to create a quoted function that should be called for ea
 again and again, by YASON:ENCODE-SLOTS."
   (lambda (slot-key-pair)
     `(let ((key   ',(car slot-key-pair))
-           (value (slot-value obj ',(car slot-key-pair))))
+           (value (ignore-errors (slot-value obj ',(car slot-key-pair)))))
        (cond ((eq key '@context) ; Encoded in YASON:ENCODE-OBJECT using *@context*
               (setq *@context* (merge-@contexts *@context* value)))
              ((eq key 'type)     ; Encode type based on class-name or TYPE slot
@@ -244,11 +244,11 @@ again and again, by YASON:ENCODE-SLOTS."
 
 (defun parse-table (table)
   "Parse a hash-table corresponding to YASON-parsed JSON into an ActivityPub object."
-  (let* ((class (car (find-registered-classes (gethash "type" table))))
+  (let* ((class (car (find-registered-classes (param-case (gethash "type" table)))))
          (obj   (make-instance class)))
     (loop for key being each hash-key of table
           for val being each hash-value of table
-          do (let ((slot-sym (car (find-registered-symbols key)))
+          do (let ((slot-sym (car (find-registered-symbols (param-case key))))
                    (val      (parse-value val)))
                (when slot-sym
                  (setf (slot-value obj slot-sym) val))))
@@ -324,15 +324,35 @@ containing both of their elements."
 ;;; Util
 ;;; ————————————————————————————————————————
 (defun camel-case (string)
+  "Convert a STRING to camel-casing. That is, casingLikeThis.
+Wrapper around STR:CAMEL-CASE, working around a bug that a non-alphanumeric
+character at the start of the string gets erroneously (or at least undesireably,
+to us) removed."
+  (keep-nonalphanumeric-prefix string
+                               (str:camel-case string)))
+
+(defun param-case (string)
+  "Convert a STRING to param-casing. That is, casing-like-this.
+Wrapper around STR:PARAM-CASE, working around a bug that a non-alphanumeric
+character at the start of the string gets erroneously (or at least undesireably,
+to us) removed."
+  (keep-nonalphanumeric-prefix string
+                               (str:param-case string)))
+(defun camel-case (str)
   "Convert a STRING to camel-casing.
 Wrapper around STR:CAMEL-CASE, working around a bug that a non-alphanumeric
 character at the start of the string gets erroneously (or at least undesireably,
 to us) removed."
-  (if (not (alphanumericp (aref string 0)))
+  (keep-nonalphanumeric-prefix str (str:camel-case str)))
+
+(defun keep-nonalphanumeric-prefix (str child-str)
+  "This ensures that a CHILD-STR derived from STR has the same nonalphanumeric
+prefix as STR, as some functions like to remove such prefixes."
+  (if (not (alphanumericp (aref str 0)))
       (concatenate 'string
-                   (string (aref string 0))
-                   (str:camel-case string))
-      (str:camel-case string)))
+                   (string (aref str 0))
+                   child-str)
+      child-str))
 
 (defun class-pretty-name (class)
   "Return a CLASS’es name in a “pretty” (sentence-capitalized) string."
