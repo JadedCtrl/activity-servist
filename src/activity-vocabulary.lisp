@@ -18,12 +18,12 @@
 (defpackage #:activity-servist/activity-vocabulary
   (:use #:cl)
   (:nicknames "AS/AV" "ACTIVITY-VOCABULARY")
-  (:shadow #:delete #:ignore #:listen #:read #:remove)
+  (:shadow #:block #:delete #:ignore #:listen #:read #:remove)
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
   (:export
    ;; Classes
-   :accept :activity :add :announce :application :arrive :article :audio
+   :accept :activity :add :announce :application :arrive :article :audio :block
    :collection :collection-page :create :delete :dislike :document :event :flag
    :follow :group :ignore :ignore :image :intransitive-activity :invite :join
    :leave :like :link :listen :move :note :object :offer :ordered-collection
@@ -37,7 +37,7 @@
    :collection-total-items
    :collection-page-next :collection-page-part-of :collection-page-prev
    :link-height :link-href :link-hreflang :link-media-type :link-name
-   :link-preview :link-rel :link-width
+   :link-preview :link-rel :link-summary :link-width
    :object-attachment :object-attributed-to :object-audience :object-bcc
    :object-bto :object-cc :object-content :object-context :object-duration
    :object-end-time :object-generator :object-icon :object-image
@@ -45,9 +45,10 @@
    :object-preview :object-published :object-replies :object-start-time
    :object-summary :object-tag :object-to :object-type :object-updated
    :object-url
-   :ordered-collection-page-start-index
+   :ordered-collection-page-start-index ordered-collection-ordered-items
    :place-accuracy :place-altitude :place-latitude :place-longitude
    :place-radius :place-units
+   :question-all-of :question-closed :question-one-of
    :profile-describes
    :relationship-object :relationship-relationship :relationship-subject
    :tombstone-former-type :tombstone-deleted))
@@ -105,8 +106,10 @@ of NAME."
    tag to updated url))
 
 ;; https://www.w3.org/ns/activitystreams#Link
+;; “summary” here isn’t real! It’s not a property Link should have (just
+;; looking at Link’s properties), but it’s implied by the Mention example.
 (defclass-w-accessors link (activity-servist/activity-streams:object)
-  (height href hreflang media-type name preview rel width))
+  (height href hreflang media-type name preview rel summary width))
 
 ;; https://www.w3.org/ns/activitystreams#Activity
 (defclass-w-accessors activity (object)
@@ -139,8 +142,8 @@ of NAME."
 ;;; Extended Activity types
 ;;; ————————————————————————————————————————
 (defclass-empty-children activity
-  (accept add announce create delete dislike flag follow ignore join leave
-          like listen move offer read reject remove travel undo update view))
+  (accept add announce block create delete dislike flag follow ignore join leave
+        like listen move offer read reject remove travel undo update view))
 
 (defclass arrive (intransitive-activity) ())
 (defclass ignore (block) ())
@@ -148,6 +151,9 @@ of NAME."
 (defclass question (intransitive-activity) ())
 (defclass tentative-accept (accept) ())
 (defclass tentative-reject (reject) ())
+
+(defclass-w-accessors question (intransitive-activity)
+  (any-of closed one-of))
 
 
 
@@ -197,4 +203,4 @@ of NAME."
 (as/as:define-class-encoders
     (mapcar #'find-class
             '(object link activity collection collection-page ordered-collection
-              ordered-collection-page place profile relationship tombstone)))
+              ordered-collection-page place profile question relationship tombstone)))
