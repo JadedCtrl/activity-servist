@@ -44,7 +44,8 @@
 We compare the original JSON to that of the parsed-then-reserialized JSON,
 ensuring they are semantically equivalent. White-space and key order are ignored."
   (let ((content (alexandria:read-file-into-string (relative-pathname path))))
-    `(define-test ,(intern (string-upcase (pathname-name path))) (:tags ,tags)
+    `(define-test ,(intern (format nil "EX-~A" (string-upcase (pathname-name path))))
+                  (:tags ,tags)
        (assert-equal
         (hash-table-sorted-alist
          (yason:parse ,content))
