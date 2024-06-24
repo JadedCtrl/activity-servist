@@ -23,7 +23,7 @@
    :parse :encode
    :define-class-encoders
    ;; Globals
-   :*ap-packages*
+   :*ap-packages* :*default-class*
    ;; Classes
    :object
    ;; Slots
@@ -40,6 +40,12 @@
 during JSON parsing. The class-name searched for is simply the value of the JSON
 object’s “type” key. The package first in the list to export such a symbol
 is the winner.")
+
+(defparameter *default-class* 'activity-servist/activity-streams:object
+  "The class used for ActivityStreams objects found during parsing that don’t
+have a corresponding class defined. Notably, all keys and values without
+corresponding slots are placed in the MISC slot.
+The class you choose should inherit ACTIVITY-SERVIST/ACTIVITY-STREAMS:OBJECT.")
 
 ;; Private, internal variable.
 (defparameter *@context* nil
@@ -96,8 +102,9 @@ again and again, by YASON:ENCODE-SLOTS."
 
 (defun parse-table (table)
   "Parse a hash-table corresponding to YASON-parsed JSON into an ActivityPub object."
-  (let* ((class (car (find-registered-classes (param-case (gethash "type" table)))))
-         (obj   (make-instance class)))
+  (let* ((found-class (car (find-registered-classes (param-case (gethash "type" table)))))
+         (class       (or found-class (find-class *default-class*)))
+         (obj         (make-instance class)))
     (loop for key being each hash-key of table
           for val being each hash-value of table
           do (let ((slot-sym (car (find-registered-symbols (param-case key))))
@@ -232,7 +239,11 @@ items in each will be contained in the resultant list."
 *ap-packages* list."
   (remove-if
    #'not
-   (mapcar (lambda (package) (find-symbol (string-upcase str) package))
+   (mapcar (lambda (package)
+             (multiple-value-bind (sym context)
+                 (find-symbol (string-upcase str) package)
+               (unless (eq context :inherited)
+                 sym)))
            *ap-packages*)))
 
 (defun find-registered-classes (str)

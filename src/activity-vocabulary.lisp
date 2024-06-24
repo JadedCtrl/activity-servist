@@ -54,6 +54,8 @@
 
 (in-package #:activity-servist/activity-vocabulary)
 
+(setq activity-servist/activity-streams:*default-class*
+      'activity-servist/activity-vocabulary:object)
 
 
 ;;; Macros
