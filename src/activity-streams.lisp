@@ -27,7 +27,7 @@
    ;; Classes
    :object
    ;; Slots
-   :@context :type))
+   :@context :type :unsupported))
 
 (in-package #:activity-servist/activity-streams)
 
@@ -44,7 +44,7 @@ is the winner.")
 (defparameter *default-class* 'activity-servist/activity-streams:object
   "The class used for ActivityStreams objects found during parsing that don’t
 have a corresponding class defined. Notably, all keys and values without
-corresponding slots are placed in the MISC slot.
+corresponding slots are placed in the UNSUPPORTED slot.
 The class you choose should inherit ACTIVITY-SERVIST/ACTIVITY-STREAMS:OBJECT.")
 
 ;; Private, internal variable.
@@ -77,6 +77,13 @@ again and again, by YASON:ENCODE-SLOTS."
            (value (ignore-errors (slot-value obj ',(car slot-key-pair)))))
        (cond ((eq key '@context) ; Encoded in YASON:ENCODE-OBJECT using *@context*
               (setq *@context* (merge-@contexts *@context* value)))
+             ((eq key 'unsupported)
+              ;; Keys/values without a slot are stored in this UNSUPPORTED alist.
+              (mapcar (lambda (cell)
+                        (yason:encode-object-element
+                         (camel-case (symbol-name (car cell)))
+                         (cdr cell)))
+                      value))
              ((eq key 'type)     ; Encode type based on class-name or TYPE slot
               (yason:encode-object-element
                "type" (or value
@@ -90,6 +97,7 @@ again and again, by YASON:ENCODE-SLOTS."
 ;;; ————————————————————————————————————————
 (defclass object ()
   ((@context :initform "https://www.w3.org/ns/activitystreams")
+   (unsupported)
    (type)))
 
 
@@ -107,10 +115,15 @@ again and again, by YASON:ENCODE-SLOTS."
          (obj         (make-instance class)))
     (loop for key being each hash-key of table
           for val being each hash-value of table
-          do (let ((slot-sym (car (find-registered-symbols (param-case key))))
-                   (val      (parse-value val)))
-               (when slot-sym
-                 (setf (slot-value obj slot-sym) val))))
+          do (let* ((slot-name (string-upcase (param-case key)))
+                    (slot-sym  (car (find-registered-symbols slot-name)))
+                    (val       (parse-value val)))
+               (handler-case
+                   (setf (slot-value obj slot-sym) val)
+                 (error nil
+                   (setf (slot-value obj 'unsupported)
+                         (append (ignore-errors (slot-value obj 'unsupported))
+                                 (list (cons (intern slot-name) val))))))))
     obj))
 
 (defun parse-value (val)
