@@ -26,8 +26,10 @@
    :*ap-packages* :*default-class*
    ;; Classes
    :object
+   ;; Accessors
+   :object-@context :object-unsupported
    ;; Slots
-   :@context :type :unsupported))
+   :@context :@type :type :@id :id :unsupported))
 
 (in-package #:activity-servist/activity-streams)
 
@@ -75,8 +77,8 @@ again and again, by YASON:ENCODE-SLOTS."
   (lambda (slot-key-pair)
     `(let ((key   ',(car slot-key-pair))
            (value (ignore-errors (slot-value obj ',(car slot-key-pair)))))
-       (cond ((eq key '@context) ; Encoded in YASON:ENCODE-OBJECT using *@context*
-              (setq *@context* (merge-@contexts *@context* value)))
+       (cond ((eq key '@context) ; Actually in YASON:ENCODE-OBJECT using *@context*
+              (setq *@context* (merge-@contexts *@context* (object-@context obj))))
              ((eq key 'unsupported)
               ;; Keys/values without a slot are stored in this UNSUPPORTED alist.
               (mapcar (lambda (cell)
@@ -96,9 +98,30 @@ again and again, by YASON:ENCODE-SLOTS."
 ;;; Core class
 ;;; ————————————————————————————————————————
 (defclass object ()
-  ((@context :initform "https://www.w3.org/ns/activitystreams")
-   (unsupported)
-   (type)))
+  ((@context          :initform nil)
+   (as/as:@type       :initform nil)
+   (as/as:type        :initform nil)
+   (as/as:@id         :initform nil)
+   (as/as:id          :initform nil)
+   (as/as:unsupported :initform nil :accessor object-unsupported)))
+
+
+
+;;; Accessors
+;;; ————————————————————————————————————————
+(defgeneric object-@context (obj)
+  (:documentation "Accessor for an object’s associated JSON-LD @context.
+As @context can sometimes vary on an object’s contents, on-the-fly, this
+method is invoked during JSON encoding of an object. The @CONTEXT
+slot-value should be prioritized over the @CONTEXT value is calculated
+by this method."))
+
+(defmethod object-@context ((obj object))
+  (or (slot-value obj '@context)
+      "https://www.w3.org/ns/activitystreams"))
+
+(defmethod (setf object-@context) (context (obj object))
+  (setf (slot-value obj '@context) context))
 
 
 
@@ -173,10 +196,10 @@ inherited class). Each slot’s name is converted to camel-case, as per conventi
      (let ((*@context* 'top-level))
        (yason:encode-object obj)))
     (symbol ; In the top-level, encode slots and then @context.
-     (setq *@context* (slot-value obj '@context))
+     (setq *@context* (object-@context obj))
      (yason:with-object ()
-      (yason:encode-slots obj)
-      (yason:encode-object-element "@context" *@context*)))
+       (yason:encode-slots obj)
+       (yason:encode-object-element "@context" *@context*)))
     (T      ; In nested objects, only encode slots — not *@context*.
      (yason:with-object ()
        (yason:encode-slots obj)))))
