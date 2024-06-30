@@ -21,31 +21,47 @@
 
 (in-package #:activity-servist/json-ld)
 
+
+;;; Globals
+;;; ————————————————————————————————————————
 (defvar *http-cache* (make-hash-table :test #'equal))
 
+
+
+;;; Parsing
+;;; ————————————————————————————————————————
 (defun parse (str)
+  "Parse the JSON-LD document contained in STR."
   (let ((ctx    (make-hash-table :test #'equal))
         (parsed (yason:parse str)))
     (values (parse-item parsed ctx)
             ctx)))
 
 (defun parse-item (item &optional ctx)
+  "Parse an individual ITEM of a YASON-decoded JSON-LD document."
   (typecase item
     (hash-table (parse-object item ctx))
     (list       (mapcar (lambda (a) (parse-item a ctx)) item))
     (T          item)))
 
 (defun parse-object (table &optional ctx)
+  "Parse a JSON “node object” (as decoded by YASON into a hash-TABLE."
   (let ((ctx (parse-context (gethash "@context" table) ctx)))
     (maphash
      (lambda (key val)
        (alexandria:when-let ((key-iri (gethash key ctx)))
          (remhash key table)
          (setf (gethash key-iri table)
-               (parse-item val ctx))))
+               (parse-item
+                val (or (and (hash-table-p val) (alexandria:copy-hash-table ctx))
+                        ctx)))))
      table)
     table))
 
+
+
+;;; Context-parsing
+;;; ————————————————————————————————————————
 (defun parse-context (ctx-list &optional (ctx (make-hash-table :test #'equal)))
   "Parse a JSON-LD map’s @context contents into a hash-table mapping string keys
 to IRIs."
@@ -58,13 +74,12 @@ to IRIs."
     (repeat-parse-context ctx unresolved)))
 
 (defun repeat-parse-context (ctx unresolved-terms)
-  "Helper function for PARSE-CONTEXT. Takes an association list of
-UNRESOLVED-TERMS, and repeats context parsing  until iterations aren’t useful or
-all terms are resolved and parsed.
-These unresolved terms are generally keys mapped to compacted IRIs, whose prefix
-(which ought be a separate term in CTX) hasn’t yet been parsed. A compacted IRI
-looks like “prefix:suffix”.
-  UNRESOLVED-TERMS => ((“Laughing” . “xd:laughing”))"
+  "Helper function for PARSE-CONTEXT.
+Takes an association list of UNRESOLVED-TERMS, and repeats context-parsing until
+all terms are resolved and parsed (or it’s clear that this isn’t possible).
+
+These unresolved terms are terms mapped to compacted IRIs whose prefix hasn’t yet
+been aprsed into CTX. See UNCOMPACT-IRI and COMPACT-IRI-P for more info on IRIs."
   (let* ((unresolved-table (alexandria:alist-hash-table unresolved-terms))
          (now-unresolved   (parse-context-map ctx unresolved-table)))
     (cond ((not now-unresolved)
@@ -96,7 +111,6 @@ hash-table."
          (parsed  (yason:parse str)))
     (parse-context (gethash "@context" parsed) ctx)))
 
-
 (defun parse-context-map (ctx table)
   "Parse an map item of a JSON-LD @context (which has been parsed by YASON into
 a hash-TABLE).
@@ -122,8 +136,12 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
      table)
     unresolvable))
 
+
+
+;;; IRI/keywords
+;;; ————————————————————————————————————————
 (defun ld-keyword-p (str)
-  "Return whether or not a string is a JSON-LD keyword."
+  "Return whether or not a string is a JSON-LD keyword, as defined in the spec."
   (member (string-downcase str)
           '("@base" "@container" "@context" "@direction" "@graph" "@id" "@import"
             "@included" "@index" "@json" "@language" "@list" "@nest" "@none"
@@ -131,8 +149,11 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
             "@value" "@version" "@vocab")))
 
 (defun uncompact-iri (iri ctx)
-  "Given a comapcted IRI, uncompact it into its full form, with CTX being a
-hash-table containing its context."
+  "Given a compacted IRI, uncompact it into its normal form, with CTX being a
+hash-table containing terms mapped to IRIs.
+For instance, if CTX maps “xd” to “http://lol.net/ns#”, then:
+    (uncompact-iri “xd:laughing” CTX) => “http://lol.net/ns#laughing”
+https://www.w3.org/TR/json-ld11/#compact-iris"
   (if (compacted-iri-p iri)
       (destructuring-bind (prefix suffix)
           (str:split #\: iri)
@@ -147,6 +168,10 @@ https://www.w3.org/TR/json-ld11/#compact-iris"
        (not (search "://" iri))
        (not (equal iri "_:"))))
 
+
+
+;;; Utility
+;;; ————————————————————————————————————————
 (defun caching-http-get (uri &key headers)
   "Makes a GET request to URI, returning the resultant string.
 Each resultant string is cached in the *HTTP-CACHE* global variable; if the same
