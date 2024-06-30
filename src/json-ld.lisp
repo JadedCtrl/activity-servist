@@ -21,6 +21,8 @@
 
 (in-package #:activity-servist/json-ld)
 
+(defvar *http-cache* (make-hash-table :test #'equal))
+
 (defun parse (str)
   (let ((ctx    (make-hash-table :test #'equal))
         (parsed (yason:parse str)))
@@ -87,9 +89,13 @@ yet been parsed into CTX."
    (:otherwise nil)))
 
 (defun parse-remote-context (ctx uri)
-  "Parse a remote JSON-LD context at URI, adding its keys to the CTX
-hash-table. Currently a stub, unimplemented."
-  nil)
+  "Parse a remote JSON-LD context at URI, adding its terms to the CTX
+hash-table."
+  (let* ((headers '(("Accept" . "application/json,application/ld+json")))
+         (str     (caching-http-get uri :headers headers))
+         (parsed  (yason:parse str)))
+    (parse-context (gethash "@context" parsed) ctx)))
+
 
 (defun parse-context-map (ctx table)
   "Parse an map item of a JSON-LD @context (which has been parsed by YASON into
@@ -135,7 +141,21 @@ hash-table containing its context."
       iri))
 
 (defun compacted-iri-p (iri)
-  "Return whether or not an IRI is in compacted prefix:suffix form."
+  "Return whether or not an IRI is in compacted “prefix:suffix” form.
+https://www.w3.org/TR/json-ld11/#compact-iris"
   (and (find #\: iri)
        (not (search "://" iri))
        (not (equal iri "_:"))))
+
+(defun caching-http-get (uri &key headers)
+  "Makes a GET request to URI, returning the resultant string.
+Each resultant string is cached in the *HTTP-CACHE* global variable; if the same
+URI is requested more than once, the cached version will subsequently be
+returned."
+  (or (gethash uri *http-cache*)
+      (setf (gethash uri *http-cache*)
+            (http-get uri :headers headers))))
+
+(defun http-get (uri &key headers)
+  "Makes a GET request to URI, returning the resultant string."
+  (dexador:get uri :headers headers :force-string 't))
