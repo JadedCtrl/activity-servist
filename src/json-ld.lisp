@@ -125,19 +125,21 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
   (let ((unresolvable '()))
     (maphash
      (lambda (term val)
-       (let* ((iri
-                (typecase val
-                  (string      (when (iri-p val) val))
-                  (hash-table  (gethash "@id" val))))
+       (let* ((id (typecase val
+                    (string     val)
+                    (hash-table (gethash "@id" val))))
+              (iri (when (iri-p id) id))
               (uncompacted-iri (ignore-errors (uncompact-iri iri ctx)))
+              (parsed-id (or uncompacted-iri
+                             (and (ld-keyword-p id) id)))
               (type
                 (typecase val
                   (string     nil)
                   (hash-table (gethash "@type" val)))))
-         (cond ((and iri (not uncompacted-iri))
+         (cond ((and id (not parsed-id))
                 (push (cons term iri) unresolvable))
                (T
-                (setf (gethash term ctx) (list :id uncompacted-iri :type type))))))
+                (setf (gethash term ctx) (list :id parsed-id :type type))))))
      table)
     unresolvable))
 
@@ -151,7 +153,8 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
           '("@base" "@container" "@context" "@direction" "@graph" "@id" "@import"
             "@included" "@index" "@json" "@language" "@list" "@nest" "@none"
             "@prefix" "@propagate" "@protected" "@reverse" "@set" "@type"
-            "@value" "@version" "@vocab")))
+            "@value" "@version" "@vocab")
+          :test #'equal))
 
 (defun uncompact-iri (iri ctx)
   "Given a compacted IRI, uncompact it into its normal form, with CTX being a
