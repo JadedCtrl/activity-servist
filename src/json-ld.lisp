@@ -48,13 +48,19 @@
   "Parse a JSON “node object” (as decoded by YASON into a hash-TABLE."
   (let ((ctx (parse-context (gethash "@context" table) ctx)))
     (maphash
-     (lambda (key val)
-       (alexandria:when-let ((key-iri (gethash key ctx)))
-         (remhash key table)
-         (setf (gethash key-iri table)
-               (parse-item
-                val (or (and (hash-table-p val) (alexandria:copy-hash-table ctx))
-                        ctx)))))
+     (lambda (old-key val)
+       (let* ((key-ctx  (gethash old-key ctx))
+              (key-iri  (getf key-ctx :id))
+              (key-type (getf key-ctx :type))
+              (new-key  (or key-iri old-key)))
+         (when key-ctx
+           (if (not (equal old-key new-key))
+               (remhash old-key table))
+           (setf (gethash new-key table)
+                 (parse-item
+                  val
+                  (or (and (hash-table-p val) (alexandria:copy-hash-table ctx))
+                      ctx))))))
      table)
     table))
 
@@ -87,8 +93,7 @@ been aprsed into CTX. See UNCOMPACT-IRI and COMPACT-IRI-P for more info on IRIs.
           ((eq (length now-unresolved)
                (length unresolved-terms))
            (values ctx now-unresolved)
-           (error 'unresolved :message
-                  (format nil "Compact IRI could not be resolved: ~A" now-unresolved)))
+           (error 'iri-unresolved :unresolved now-unresolved))
           (T
            (repeat-parse-context ctx now-unresolved)))))
 
@@ -122,17 +127,17 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
      (lambda (term val)
        (let* ((iri
                 (typecase val
-                  (string val)
-                  (hash-table (gethash "@id" val))))
-              (noncompact-iri
-                (if (ld-keyword-p iri)
-                    iri
-                    (uncompact-iri iri ctx))))
-         (cond ((and (compacted-iri-p iri)
-                     (not noncompact-iri))
+                  (string      (when (iri-p val) val))
+                  (hash-table  (gethash "@id" val))))
+              (uncompacted-iri (ignore-errors (uncompact-iri iri ctx)))
+              (type
+                (typecase val
+                  (string     nil)
+                  (hash-table (gethash "@type" val)))))
+         (cond ((and iri (not uncompacted-iri))
                 (push (cons term iri) unresolvable))
-               ((not (gethash term ctx))
-                (setf (gethash term ctx) noncompact-iri)))))
+               (T
+                (setf (gethash term ctx) (list :id uncompacted-iri :type type))))))
      table)
     unresolvable))
 
@@ -157,16 +162,63 @@ https://www.w3.org/TR/json-ld11/#compact-iris"
   (if (compacted-iri-p iri)
       (destructuring-bind (prefix suffix)
           (str:split #\: iri)
-        (alexandria:when-let ((prefix-iri (gethash (string-downcase prefix) ctx)))
-         (format nil "~A~A" prefix-iri suffix)))
-      iri))
+        (let* ((prefix-ctx (gethash (string-downcase prefix) ctx))
+               (prefix-iri (when prefix-ctx (getf prefix-ctx :id))))
+          (if prefix-iri
+              (format nil "~A~A" prefix-iri suffix)
+              (error 'iri-prefix-not-found :iri prefix))))
+      (if (not (iri-p iri))
+          (error 'not-iri :iri iri)
+          iri)))
 
-(defun compacted-iri-p (iri)
-  "Return whether or not an IRI is in compacted “prefix:suffix” form.
+(defun iri-p (str)
+  "Return whether or not a string is an IRI, compacted or otherwise."
+  (or (uncompacted-iri-p str)
+      (compacted-iri-p str)))
+
+(defun uncompacted-iri-p (str)
+  "Return whether or not a string is an orindary IRI."
+  (search "://" str))
+
+(defun compacted-iri-p (str)
+  "Return whether or not a string is an IRI in compacted “prefix:suffix” form.
 https://www.w3.org/TR/json-ld11/#compact-iris"
-  (and (find #\: iri)
-       (not (search "://" iri))
-       (not (equal iri "_:"))))
+  (and (find #\: str)
+       (not (search "://" str))
+       (not (equal str "_:"))))
+
+
+
+;;; Conditions
+;;; ————————————————————————————————————————
+(define-condition iri-error (error)
+  ((iri :initarg :iri :initform nil :accessor iri-error-iri)))
+
+(define-condition not-iri (iri-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "“~A” is not a valid IRI." (iri-error-iri condition))))
+  (:documentation
+   "A string containing an IRI was expected, but something else was provided."))
+
+(define-condition iri-prefix-not-found (iri-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "Failed to find IRI prefix in context: ~A" (iri-error-iri condition))))
+  (:documentation
+   "Attempted to resolve a compact IRI’s prefix, but its prefix hasn’t yet been
+defined in the context."))
+
+(define-condition context-error (error)
+  ((unresolved :initarg :unresolved :initform nil :accessor context-error-unresolved)))
+
+(define-condition iri-unresolved (context-error) ()
+  (:report
+   (lambda (condition stream)
+     (format nil "Compact IRI(s) in context could not be resolved: ~A"
+             (context-error-unresolved condition))))
+  (:documentation
+   "Compact IRI(s)’ prefixes couldn’t be resolved, having analyzed all context items."))
 
 
 
