@@ -19,7 +19,7 @@
   (:use #:cl)
   (:nicknames "AS/JSON-LD" "JSON-LD")
   (:export
-   #:define-json-class))
+   #:define-json-type #:json-ld-context))
 
 (in-package #:activity-servist/json-ld)
 
@@ -29,8 +29,20 @@
 (defvar *http-cache* (make-hash-table :test #'equal))
 (defvar *json-types* ())
 
+
+
+;;; Base class
+;;; ————————————————————————————————————————
 (defclass json-ld-type ()
   ((@context :initform "https://www.w3.org/ns/activitystreams")))
+
+(defgeneric json-ld-context (obj)
+  (:documentation
+   "Returns a JSON-LD CLOS object’s @context, for use in JSON-encoding of the
+object.
+The implementation for the JSON-LD-TYPE class simply returns the @context slot’s
+value. If you would like to have more a more elaborate logic to @context, you
+should override this method."))
 
 (defmethod json-ld-context ((obj json-ld-type))
   (slot-value obj '@context))
@@ -38,7 +50,11 @@
 (defmethod yason:encode-slots progn ((obj json-ld-type))
   (yason:encode-object-element "@context" (json-ld-context obj)))
 
-(defmacro define-json-class (names direct-superclasses context direct-slots &rest options)
+
+
+;;; CLOS definition
+;;; ————————————————————————————————————————
+(defmacro define-json-type (names direct-superclasses context direct-slots &rest options)
   "Used to define a CLOS class and a JSON encoder/decoder for a JSON-LD node-type.
 An instance of class will be output, instead of a hash-table, when parsing JSON-LD
 with JSON-LD:PARSE. Instances of this class can be encoded into JSON with YASON:ENCODE.
@@ -91,13 +107,14 @@ Here is a brief example partially defining the “Place” type from ActivityStr
                 :required T
                 :documentation “The longitude of a place.”)))"
   `(progn
-     (define-json-clos-class ,names ,(or direct-superclasses '(json-ld-type)) ,context ,direct-slots ,options)
-     (define-json-class-encoder ,(car names) ,direct-slots)))
+     (define-json-clos-class ,names ,(or direct-superclasses '(json-ld-type))
+       ,direct-slots ,options)
+     (define-json-type-encoder ,(car names) ,direct-slots)))
 
-(defmacro define-json-clos-class (names direct-superclasses context direct-slots options)
-  "Helper-macro for DEFINE-JSON-CLASS.
+(defmacro define-json-clos-class (names direct-superclasses direct-slots options)
+  "Helper-macro for DEFINE-JSON-TYPE.
 This actually defines the CLOS class for a JSON-LD node-type.
-See DEFINE-JSON-CLASS’s docstring for a description of parameters."
+See DEFINE-JSON-TYPE’s docstring for a description of parameters."
   (append `(defclass ,(car names) ,direct-superclasses
              ,(mapcar (lambda (slot)
                         (let* ((our-slot-opts
@@ -110,30 +127,20 @@ See DEFINE-JSON-CLASS’s docstring for a description of parameters."
                direct-slots))
           options))
 
-(defmacro define-json-class-encoder (class direct-slots)
-  "Helper-macro for DEFINE-JSON-CLOS-CLASS.
-This actually defines the YASON-encoder for a JSON-LD node-type.
-CLASS is the class-name; see DEFINE-JSON-CLASS’s docstring about DIRECT-SLOTS."
-  (append
-   `(defmethod yason:encode-slots progn ((obj ,class)))
-   (mapcar (lambda (slot)
-             `(yason:encode-object-element ,(cadr slot) (slot-value obj ',(car slot))))
-           direct-slots)))
-
 (defun json-type-slot-options (class-name slot-name slot-opts)
-  "Return DEFCLASS-format slot options from DEFINE-JSON-CLASS-format SLOT-OPTS,
+  "Return DEFCLASS-format slot options from DEFINE-JSON-TYPE-format SLOT-OPTS,
 applying default slot-options, etc."
   (json-type-normalize-slot-options
    (merge-plists (json-type-implicit-slot-options class-name slot-name)
                  slot-opts)))
 
 (defun json-type-implicit-slot-options (class-name slot-name)
-  "Return default property-list slot options for a JSON-type CLOS class."
+  "Return default property-list slot options for a json-type CLOS class."
   (list :initform nil
         :accessor (intern (format nil "~A-~A" class-name slot-name))))
 
 (defun json-type-normalize-slot-options (slot-opts)
-  "Take property-list slot options from a DEFINE-JSON-CLASS format and massage it
+  "Take property-list slot options from a DEFINE-JSON-TYPE format and massage it
 into a DEFCLASS format."
   (let* ((required            (getf slot-opts :required))
          (sans-required       (alexandria:remove-from-plist slot-opts :required))
@@ -145,6 +152,20 @@ into a DEFCLASS format."
                                   (alexandria:remove-from-plist sans-initform-maybe :accessor)
                                   sans-initform-maybe)))
     sans-accessor-maybe))
+
+
+
+;;; Encoding
+;;; ————————————————————————————————————————
+(defmacro define-json-type-encoder (class direct-slots)
+  "Helper-macro for DEFINE-JSON-CLOS-CLASS.
+This actually defines the YASON-encoder for a JSON-LD node-type.
+CLASS is the class-name; see DEFINE-JSON-TYPE’s docstring about DIRECT-SLOTS."
+  (append
+   `(defmethod yason:encode-slots progn ((obj ,class)))
+   (mapcar (lambda (slot)
+             `(yason:encode-object-element ,(cadr slot) (slot-value obj ',(car slot))))
+           direct-slots)))
 
 
 
