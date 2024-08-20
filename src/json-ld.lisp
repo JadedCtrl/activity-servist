@@ -27,25 +27,39 @@
 ;;; Globals
 ;;; ————————————————————————————————————————
 (defvar *http-cache* (make-hash-table :test #'equal))
-(defvar *json-types* ())
+(defvar *json-types* (make-hash-table :test #'equal))
 
 
 
 ;;; Base class
 ;;; ————————————————————————————————————————
 (defclass json-ld-type ()
-  ((@context :initform "https://www.w3.org/ns/activitystreams")))
+  ((@context
+    :initform nil
+    :documentation
+    "Used as an override for a class’es @context during encoding.
+The method JSON-LD-CONTEXT is how the contents of encoded @context is
+determined; to change a class’es default/calculated @context, override that
+method. This slot is for changing a specific object’s @context.")
+   (etc
+    :initform nil
+    :documentation
+    "Components of the JSON object which, during parsing, did not match any specific
+slot. This is often filled up in the case of undefined node-types or non-adherent
+object definitions.")))
 
 (defgeneric json-ld-context (obj)
   (:documentation
    "Returns a JSON-LD CLOS object’s @context, for use in JSON-encoding of the
 object.
-The implementation for the JSON-LD-TYPE class simply returns the @context slot’s
-value. If you would like to have more a more elaborate logic to @context, you
-should override this method."))
+The implementation for the JSON-LD-TYPE class simply returns the activitystreams
+URL.
+If you would like to change @context on a class-level, override this method.
+If you would like to change it on an object-level, set the @CONTEXT slot."))
 
 (defmethod json-ld-context ((obj json-ld-type))
-  (slot-value obj '@context))
+  (or (slot-value obj '@context)
+      "https://www.w3.org/ns/activitystreams"))
 
 (defmethod yason:encode-slots progn ((obj json-ld-type))
   (yason:encode-object-element "@context" (json-ld-context obj)))
@@ -106,10 +120,13 @@ Here is a brief example partially defining the “Place” type from ActivityStr
      (longitude “longitude”
                 :required T
                 :documentation “The longitude of a place.”)))"
-  `(progn
-     (define-json-clos-class ,names ,(or direct-superclasses '(json-ld-type))
-       ,direct-slots ,options)
-     (define-json-type-encoder ,(car names) ,direct-slots)))
+  `(let ((json-class
+           (define-json-clos-class ,names
+               ,(or direct-superclasses `(json-ld-type))
+             ,direct-slots ,options)))
+     (define-json-type-encoder ,(car names) ,direct-slots)
+     (register-json-type ',names ',direct-slots ,context)
+     json-class))
 
 (defmacro define-json-clos-class (names direct-superclasses direct-slots options)
   "Helper-macro for DEFINE-JSON-TYPE.
@@ -171,39 +188,114 @@ CLASS is the class-name; see DEFINE-JSON-TYPE’s docstring about DIRECT-SLOTS."
 
 ;;; Parsing
 ;;; ————————————————————————————————————————
+(defun register-json-type (names direct-slots context)
+  "Register a JSON node-type. This allows PARSE to recognize the type (and
+corresponding CLOS class) of a node."
+  (let* ((ctx       (parse-context context))
+         (type-iri  (getf (gethash (cadr names) ctx) :id))
+         (type-name (or type-iri (cadr names))))
+    (setf (gethash type-name *json-types*)
+          (json-type-registry-list names ctx direct-slots))))
+
+(defun json-type-registry-list (names parsed-context direct-slots)
+  "Return a REGISTER-JSON-TYPE-formed registry entry, a simple list of the form:
+  (TYPE-IRI (PROPERTY-NAME SLOT-NAME) ⋯ (PROPERTY-NAME SLOT-NAME))
+… where TYPE-IRI is the (hopefully) fully-resolved IRI form of the node-type’s
+name, though it might be unresolved if context was unprovided or lacking."
+  (append (list (cons (car names) (cadr names)))
+          (mapcar
+           (lambda (slot)
+             (when (cadr slot)
+               (let* ((property-name (cadr slot))
+                      (slot-name     (car slot))
+                      (ctx-item      (gethash property-name parsed-context))
+                      (url           (or (getf ctx-item :id)
+                                         property-name)))
+                 (cons url (cons slot-name property-name)))))
+           direct-slots)))
+
 (defun parse (str)
   "Parse the JSON-LD document contained in STR."
-  (let ((ctx    (make-hash-table :test #'equal))
+  (let ((ctx     (make-hash-table :test #'equal)) ; Parsed context: IRI→name,etc.
+        (rev-ctx (make-hash-table :test #'equal)) ; Inversed ctx: name→IRI
         (parsed (yason:parse str)))
-    (values (parse-item parsed ctx)
+    (values (parse-item parsed ctx rev-ctx)
             ctx)))
 
-(defun parse-item (item &optional ctx)
+(defun parse-item (item &optional ctx rev-ctx)
   "Parse an individual ITEM of a YASON-decoded JSON-LD document."
   (typecase item
-    (hash-table (parse-object item ctx))
+    (hash-table (parse-table item ctx rev-ctx))
     (list       (mapcar (lambda (a) (parse-item a ctx)) item))
     (T          item)))
 
-(defun parse-object (table &optional ctx)
+(defun parse-table (table &optional ctx rev-ctx)
   "Parse a JSON “node object” (as decoded by YASON into a hash-TABLE."
   (let ((ctx (parse-context (gethash "@context" table) ctx)))
+    ;; Update our inverted context-table, so we can resolve property-names→IRIs.
+    (when (not (eq (hash-table-count rev-ctx)
+                   (hash-table-count ctx)))
+      (copy-hash-table-to ctx rev-ctx)
+      (invert-hash-table rev-ctx (lambda (val)
+                                   (getf val :id))))
+    ;; Now, actually parse.
+    (let* ((parsed-table (parse-table-inplace table ctx))
+           (type         (identify-json-type table ctx rev-ctx))
+           (typedef      (gethash type *json-types*)))
+      (if typedef
+          (parse-table-into-object parsed-table typedef ctx rev-ctx) ; We prefer this!
+          parsed-table)))) ; … but just in case you wanna use an undefined type…
+
+(defun parse-table-inplace (table ctx)
+  "Expand a YASON-parsed JSON-LD node-object in TABLE. That is, replace all
+property-names (like, say, “duration”) with their uncompacted-IRI forms
+(like “https://www.w3.org/ns/activitystreams#duration”).
+CTX should be the parsed-context corresponding to the table."
+  (maphash
+   (lambda (old-key val)
+     (let* ((key-ctx  (gethash old-key ctx))
+            (key-iri  (getf key-ctx :id))
+            (key-type (getf key-ctx :type))
+            (new-key  (or key-iri old-key)))
+       (when key-ctx
+         (if (not (equal old-key new-key))
+             (remhash old-key table))
+         (setf (gethash new-key table)
+               (parse-item
+                val
+                (or (and (hash-table-p val) (alexandria:copy-hash-table ctx))
+                    ctx))))))
+   table)
+  table)
+
+(defun parse-table-into-object (table type-def ctx rev-ctx)
+  "Parse an expanded-form JSON-LD object (TABLE) into a CLOS object.
+TYPE-DEF is a type-definition list of the form found in *JSON-TYPES* and made
+by REGISTER-JSON-TYPE.
+CTX is the according parsed-context, and REV-CTX is the reversed
+(IRI → property-name) context."
+  (let ((obj (make-instance (caar type-def))))
     (maphash
-     (lambda (old-key val)
-       (let* ((key-ctx  (gethash old-key ctx))
-              (key-iri  (getf key-ctx :id))
-              (key-type (getf key-ctx :type))
-              (new-key  (or key-iri old-key)))
-         (when key-ctx
-           (if (not (equal old-key new-key))
-               (remhash old-key table))
-           (setf (gethash new-key table)
-                 (parse-item
-                  val
-                  (or (and (hash-table-p val) (alexandria:copy-hash-table ctx))
-                      ctx))))))
+     (lambda (property value)
+       (let* ((property-def  (assoc property type-def :test #'equal))
+              (slot-name     (second property-def))
+              (etc-value     (slot-value obj 'etc)))
+         (if property-def
+             (setf (slot-value obj slot-name) value)
+             (setf (slot-value obj 'etc)
+                   (append etc-value
+                           (list (cons property value)))))))
      table)
-    table))
+    (setf (slot-value obj '@context) (gethash "@context" table))
+    obj))
+
+(defun identify-json-type (table ctx rev-ctx)
+  "Given an parsed JSON-LD object’s hash-TABLE, return the name/IRI of the
+JSON-type that best suits the object — using the types registered into
+*JSON-TYPES* with REGISTER-JSON-TYPE."
+  (let* ((type (gethash "@type" table)))
+    (or (getf (gethash type ctx) :id)
+        type)))
 
 
 
@@ -247,7 +339,7 @@ yet been parsed into CTX."
   (typecase item
    (string     (parse-remote-context ctx item))
    (hash-table (parse-context-map    ctx item))
-   (:otherwise nil)))
+   (T           nil)))
 
 (defun parse-remote-context (ctx uri)
   "Parse a remote JSON-LD context at URI, adding its terms to the CTX
@@ -380,3 +472,47 @@ returned."
 (defun http-get (uri &key headers)
   "Makes a GET request to URI, returning the resultant string."
   (dexador:get uri :headers headers :force-string 't))
+
+(defun invert-hash-table (table &optional tf)
+  "Return a copy of TABLE with the keys and values inverted.
+All values are the new keys for the old keys, and all old keys are…
+wait, I’m getting confused now. Oh, whatever, you know what’s up!
+
+Optionally, a TF function can be provided, which will be executed
+with the new key as its parameter, and whose return-value will be
+the key. Useful for sanitization!"
+  (let ((new-table (alexandria:copy-hash-table table)))
+    (maphash (lambda (old-key old-val)
+               (let ((new-key (if tf (funcall tf old-val) old-val)))
+                 (remhash old-key new-table)
+                 (setf (gethash new-key new-table) old-key)))
+             new-table)
+    new-table))
+
+(defun copy-hash-table-to (from to &optional (clobber nil))
+  "Shallowly copies the keys+values of hash-table FROM into TO.
+If CLOBBER is set, old-values in TO will be overwritten."
+  (maphash (lambda (key val)
+             (let ((in-to (gethash key to)))
+               (when (or (and clobber in-to)
+                         (not in-to))
+                     (setf (gethash key to) val))))
+           from)
+  to)
+
+(defun plist-keys (plist)
+  "Return a list of keys in a property list."
+  (remove-if #'not
+   (loop for item in plist
+         for i from 0
+         collect (when (evenp i) item))))
+
+(defun merge-plists (a b)
+  "Merge two property lists, favouring adding all properties of A to B not
+pre-existing in B."
+  (let ((a-keys (plist-keys a))
+        (b-keys (plist-keys b)))
+    (loop for key in a-keys
+          do (when (not (find key b-keys))
+               (setf (getf b key) (getf a key))))
+    b))
