@@ -19,7 +19,11 @@
   (:use #:cl)
   (:nicknames "AS/JSON-LD" "JSON-LD")
   (:export
-   #:define-json-type #:json-ld-context))
+   #:define-json-type
+   ;; Accessors
+   #:json-ld-context #:json-ld-etc #:json-ld-id #:json-ld-type
+   ;; Slots
+   :@context :@id :@type :.etc))
 
 (in-package #:activity-servist/json-ld)
 
@@ -33,7 +37,7 @@
 
 ;;; Base class
 ;;; ————————————————————————————————————————
-(defclass json-ld-type ()
+(defclass json-ld-object ()
   ((@context
     :initform nil
     :documentation
@@ -41,28 +45,57 @@
 The method JSON-LD-CONTEXT is how the contents of encoded @context is
 determined; to change a class’es default/calculated @context, override that
 method. This slot is for changing a specific object’s @context.")
-   (etc
+   (@id
     :initform nil
+    :accessor json-ld-id
+    :documentation
+    "Provides the globally unique identifier for an object.")
+   (@type
+    :initform nil
+    :accessor json-ld-type
+    :documentation
+    "Identifies the type of an object. Used to determine the corresponding CLOS-object.")
+   (.etc
+    :initform nil
+    :accessor json-ld-etc
     :documentation
     "Components of the JSON object which, during parsing, did not match any specific
 slot. This is often filled up in the case of undefined node-types or non-adherent
 object definitions.")))
 
+(setf (gethash "*" *json-types*)
+      '((json-ld-object)
+        ("@context" @context . "@context")
+        ("@id" @id . "@id")
+        ("@type" @type . "@type")))
+
 (defgeneric json-ld-context (obj)
   (:documentation
    "Returns a JSON-LD CLOS object’s @context, for use in JSON-encoding of the
 object.
-The implementation for the JSON-LD-TYPE class simply returns the activitystreams
+The implementation for the JSON-LD-OBJECT class simply returns the activitystreams
 URL.
 If you would like to change @context on a class-level, override this method.
 If you would like to change it on an object-level, set the @CONTEXT slot."))
 
-(defmethod json-ld-context ((obj json-ld-type))
+(defmethod json-ld-context ((obj json-ld-object))
   (or (slot-value obj '@context)
       "https://www.w3.org/ns/activitystreams"))
 
-(defmethod yason:encode-slots progn ((obj json-ld-type))
-  (yason:encode-object-element "@context" (json-ld-context obj)))
+(defmethod yason:encode-slots progn ((obj json-ld-object))
+  (let ((context (json-ld-context obj))
+        (id      (json-ld-id obj))
+        (type    (json-ld-type obj)))
+   (when context
+     (yason:encode-object-element "@context" (json-ld-context obj)))
+   (when id
+     (yason:encode-object-element "@id"      (json-ld-id obj)))
+   (when type
+     (yason:encode-object-element "@type"    (json-ld-type obj))))
+  (mapcar (lambda (alist-cell)
+            (yason:encode-object-element (car alist-cell)
+                                         (cdr alist-cell)))
+          (json-ld-etc obj)))
 
 
 
@@ -78,8 +111,9 @@ encoding as @type’s value. If only the CLOS class-name is provided, @type will
 not be encoded for this object.
 
 DIRECT-SUPERCLASSES is a list of JSON-LD CLOS classes, whose slots and context
-this should inherit. JSON-LD-TYPE should be somewhere in the hierarchy, in order
-to provide “@context”; if no superclasses are provided, JSON-LD-TYPE is default.
+this should inherit. JSON-LD-OBJECT should be somewhere in the hierarchy, in order
+to provide “@context”, “@id”, and “@type”; if no superclasses are provided,
+JSON-LD-OBJECT is default.
 
 CONTEXT is a context hash-table, parsed from a JSON-LD context by JSON-LD:PARSE
 or JSON-LD:PARSE-CONTEXT. Any terms defined in this context will be used to
@@ -94,13 +128,7 @@ encoded nor decoded in JSON.
 
 SLOT-OPTIONS are key/value pairs in the format of DEFCLASS’es slot-options.
 Keywords such as :INITFORM, :DOCUMENTATION, etc. can be used.
-There are two keywords with behavior unlike DEFCLASS, however:
-:REQUIRED and :ACCESSOR.
-
-By default, a slot will have an init-form of NIL; this can of course be
-overridden by putting :INITFORM yourself in the slot definition.
-Set :REQUIRED to T to not set :INITFORM at all, effectively making the slot
-“required.”
+There is one keyword with behavior unlike DEFCLASS, however — :ACCESSOR.
 
 By default, a slot will have an accessor named after the class and slot, like
 PLACE-RADIUS for the class PLACE and the slot RADIUS.
@@ -115,17 +143,15 @@ Here is a brief example partially defining the “Place” type from ActivityStr
     ((altitude  “altitude”
                 :documentation “Indicates the altitude of a place.”)
      (latitude  “latitude”
-                :required T
                 :documentation “The latitude of a place.”)
      (longitude “longitude”
-                :required T
                 :documentation “The longitude of a place.”)))"
   `(let ((json-class
            (define-json-clos-class ,names
-               ,(or direct-superclasses `(json-ld-type))
+               ,(or direct-superclasses `(json-ld-object))
              ,direct-slots ,options)))
      (define-json-type-encoder ,(car names) ,direct-slots)
-     (register-json-type ',names ',direct-slots ,context)
+     (register-json-type ',names (or ',direct-superclasses '(json-ld-object)) ',direct-slots ,context)
      json-class))
 
 (defmacro define-json-clos-class (names direct-superclasses direct-slots options)
@@ -153,21 +179,15 @@ applying default slot-options, etc."
 
 (defun json-type-implicit-slot-options (class-name slot-name)
   "Return default property-list slot options for a json-type CLOS class."
-  (list :initform nil
-        :accessor (intern (format nil "~A-~A" class-name slot-name))))
+  (list :accessor (intern (format nil "~A-~A" class-name slot-name))))
 
 (defun json-type-normalize-slot-options (slot-opts)
   "Take property-list slot options from a DEFINE-JSON-TYPE format and massage it
 into a DEFCLASS format."
-  (let* ((required            (getf slot-opts :required))
-         (sans-required       (alexandria:remove-from-plist slot-opts :required))
-         (sans-initform-maybe (if required
-                                  (alexandria:remove-from-plist sans-required :initform)
-                                  sans-required))
-         (sans-accessor-maybe (if (and (find :accessor slot-opts)
+  (let* ((sans-accessor-maybe (if (and (find :accessor slot-opts)
                                        (not (getf slot-opts :accessor)))
-                                  (alexandria:remove-from-plist sans-initform-maybe :accessor)
-                                  sans-initform-maybe)))
+                                  (alexandria:remove-from-plist slot-opts :accessor)
+                                  slot-opts)))
     sans-accessor-maybe))
 
 
@@ -181,38 +201,51 @@ CLASS is the class-name; see DEFINE-JSON-TYPE’s docstring about DIRECT-SLOTS."
   (append
    `(defmethod yason:encode-slots progn ((obj ,class)))
    (mapcar (lambda (slot)
-             `(yason:encode-object-element ,(cadr slot) (slot-value obj ',(car slot))))
+             `(when (slot-boundp obj ',(car slot))
+                (yason:encode-object-element ,(cadr slot) (slot-value obj ',(car slot)))))
            direct-slots)))
 
 
 
 ;;; Parsing
 ;;; ————————————————————————————————————————
-(defun register-json-type (names direct-slots context)
+(defun register-json-type (names direct-superclasses direct-slots context)
   "Register a JSON node-type. This allows PARSE to recognize the type (and
 corresponding CLOS class) of a node."
   (let* ((ctx       (parse-context context))
          (type-iri  (getf (gethash (cadr names) ctx) :id))
          (type-name (or type-iri (cadr names))))
     (setf (gethash type-name *json-types*)
-          (json-type-registry-list names ctx direct-slots))))
+          (json-type-registry-list names direct-superclasses ctx direct-slots))))
 
-(defun json-type-registry-list (names parsed-context direct-slots)
+(defun json-type-registry-list (names direct-superclasses parsed-context direct-slots)
   "Return a REGISTER-JSON-TYPE-formed registry entry, a simple list of the form:
   (TYPE-IRI (PROPERTY-NAME SLOT-NAME) ⋯ (PROPERTY-NAME SLOT-NAME))
 … where TYPE-IRI is the (hopefully) fully-resolved IRI form of the node-type’s
 name, though it might be unresolved if context was unprovided or lacking."
-  (append (list (cons (car names) (cadr names)))
-          (mapcar
-           (lambda (slot)
-             (when (cadr slot)
-               (let* ((property-name (cadr slot))
-                      (slot-name     (car slot))
-                      (ctx-item      (gethash property-name parsed-context))
-                      (url           (or (getf ctx-item :id)
-                                         property-name)))
-                 (cons url (cons slot-name property-name)))))
-           direct-slots)))
+  (append
+   ;; The class-name and type-name.
+   (list (cons (car names) (cadr names)))
+   ;; Add the class’es direct slots.
+   (mapcar
+    (lambda (slot)
+      (when (cadr slot)
+        (let* ((property-name (cadr slot))
+               (slot-name     (car slot))
+               (ctx-item      (gethash property-name parsed-context))
+               (url           (or (getf ctx-item :id)
+                                  property-name)))
+          (cons url (cons slot-name property-name)))))
+    direct-slots)
+   ;; Add the slots of parent-classes.
+   (reduce (lambda (slots-a slots-b)
+             (append slots-a slots-b))
+           (mapcar (lambda (class-name)
+                     (let* ((type-name     (class-json-type-name class-name))
+                            (type-registry (gethash type-name *json-types*)))
+                       (if type-registry
+                           type-registry)))
+                   direct-superclasses))))
 
 (defun parse (str)
   "Parse the JSON-LD document contained in STR."
@@ -240,11 +273,10 @@ name, though it might be unresolved if context was unprovided or lacking."
                                    (getf val :id))))
     ;; Now, actually parse.
     (let* ((parsed-table (parse-table-inplace table ctx))
-           (type         (identify-json-type table ctx rev-ctx))
-           (typedef      (gethash type *json-types*)))
-      (if typedef
-          (parse-table-into-object parsed-table typedef ctx rev-ctx) ; We prefer this!
-          parsed-table)))) ; … but just in case you wanna use an undefined type…
+           (type         (identify-json-type table ctx))
+           (type-def      (or (gethash type *json-types*)
+                              (gethash "*"  *json-types*))))
+      (parse-table-into-object parsed-table type-def ctx rev-ctx))))
 
 (defun parse-table-inplace (table ctx)
   "Expand a YASON-parsed JSON-LD node-object in TABLE. That is, replace all
@@ -279,23 +311,30 @@ CTX is the according parsed-context, and REV-CTX is the reversed
      (lambda (property value)
        (let* ((property-def  (assoc property type-def :test #'equal))
               (slot-name     (second property-def))
-              (etc-value     (slot-value obj 'etc)))
+              (etc-value     (slot-value obj '.etc)))
          (if property-def
              (setf (slot-value obj slot-name) value)
-             (setf (slot-value obj 'etc)
+             (setf (slot-value obj '.etc)
                    (append etc-value
                            (list (cons property value)))))))
      table)
     (setf (slot-value obj '@context) (gethash "@context" table))
     obj))
 
-(defun identify-json-type (table ctx rev-ctx)
+(defun identify-json-type (table ctx)
   "Given an parsed JSON-LD object’s hash-TABLE, return the name/IRI of the
 JSON-type that best suits the object — using the types registered into
 *JSON-TYPES* with REGISTER-JSON-TYPE."
   (let* ((type (gethash "@type" table)))
     (or (getf (gethash type ctx) :id)
         type)))
+
+(defun class-json-type-name (class-name)
+  "Return the name (IRI) of a registered JSON-type its CLOS class’es name."
+  (loop for iri      being the hash-keys   in *json-types*
+        for registry being the hash-values in *json-types*
+        if (eq class-name (caar registry))
+          return iri))
 
 
 
