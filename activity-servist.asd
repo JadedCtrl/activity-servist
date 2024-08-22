@@ -15,16 +15,15 @@
   :components ((:file "src/activity-servist")))
 
 
-(asdf:defsystem "activity-servist/activity-streams"
+(asdf:defsystem "activity-servist/activity-vocabulary"
   :version "0.0"
   :license "AGPLv3"
-  :description "A-S subpackage for handling ActivityStreams parsing/encoding."
+  :description "A-S subpackage containing ActivityVocabulary class-definitions."
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :depends-on ("alexandria" "closer-mop" "str" "yason")
-  :components ((:file "src/activity-streams")
-               (:file "src/activity-vocabulary")))
+  :depends-on ("activity-servist/json-ld")
+  :components ((:file "src/activity-vocabulary")))
 
 
 (asdf:defsystem "activity-servist/json-ld"
@@ -34,7 +33,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :depends-on ("alexandria" "closer-mop" "str" "yason")
+  :depends-on ("alexandria" "dexador" "str" "yason")
   :components ((:file "src/json-ld")))
 
 
@@ -61,14 +60,15 @@
   :depends-on (:activity-servist/json-ld :alexandria :lisp-unit2)
   :components ((:file "t/json-ld")))
 
-(asdf:defsystem "activity-servist/tests/activity-streams"
+
+(asdf:defsystem "activity-servist/tests/activity-vocabulary"
   :version "0.0"
   :license "AGPLv3"
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for the the activity-servist/activity-streams package."
+  :description "Tests for the the activity-servist/activity-vocabulary package."
 
-  :depends-on (:activity-servist/activity-streams :alexandria :lisp-unit2)
-  :components ((:file "t/activity-streams")))
+  :depends-on (:activity-servist/activity-vocabulary :alexandria :lisp-unit2)
+  :components ((:file "t/activity-vocabulary")))
 
 
 (asdf:defsystem "activity-servist/tests/signatures"
@@ -99,7 +99,7 @@
   `(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system ',package))))
      (eval (read-from-string (format nil "(~A:run-with-summary)" ',package)))))
 
-(define-asdf-testing activity-servist/tests/activity-streams)
+(define-asdf-testing activity-servist/tests/activity-vocabulary)
 (define-asdf-testing activity-servist/tests/json-ld)
 (define-asdf-testing activity-servist/tests/signatures)
 (define-asdf-testing activity-servist/tests)

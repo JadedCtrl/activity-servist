@@ -19,7 +19,7 @@
   (:use #:cl)
   (:nicknames "AS/JSON-LD" "JSON-LD")
   (:export
-   #:define-json-type
+   #:parse #:define-json-type
    ;; Accessors
    #:json-ld-context #:json-ld-etc #:json-ld-id #:json-ld-type
    ;; Slots

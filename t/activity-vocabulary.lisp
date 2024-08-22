@@ -1,4 +1,4 @@
-;;;; activity-servist/tests/activity-streams: Testing activity-streams.
+;;;; activity-servist/tests/activity-vocabulary: Testing activity-vocabulary.
 
 ;; Copyright © 2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,19 +15,19 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage :activity-servist/tests/activity-streams
+(defpackage :activity-servist/tests/activity-vocabulary
   (:use :cl :lisp-unit2)
-  (:nicknames "AS/T/AS")
+  (:nicknames "AS/T/AV")
   (:export :run :run-with-summary))
 
-(in-package :activity-servist/tests/activity-streams)
+(in-package :activity-servist/tests/activity-vocabulary)
 
 (defun run ()
-  "Run all ACTIVITY-STREAMS tests."
-  (lisp-unit2:run-tests :package :activity-servist/tests/activity-streams))
+  "Run all ACTIVITY-VOCABULARY tests."
+  (lisp-unit2:run-tests :package :activity-servist/tests/activity-vocabulary))
 
 (defun run-with-summary ()
-  "Run tests with summary for ACTIVITY-STREAMS."
+  "Run tests with summary for ACTIVITY-VOCABULARY."
   (lisp-unit2:with-summary()
     (run)))
 
@@ -53,7 +53,7 @@ ensuring they are semantically equivalent. White-space and key order are ignored
          (yason:parse
           (yason:with-output-to-string* ()
             (yason:encode-object
-             (as/as:parse ,content)))))))))
+             (json-ld:parse ,content)))))))))
 
 (defun sort-alist (alist predicate)
   "Sort an associative list by its keys."
@@ -91,4 +91,4 @@ Any nested hash-tables found as values are also sorted, recursively."
 (mapcar (lambda (file)
           (eval `(define-json-test ,file '(:activity-vocabulary))))
         (uiop:directory-files
-         (relative-pathname "t/activity-streams/activity-vocabulary/")))
+         (relative-pathname "t/activity-vocabulary/")))
