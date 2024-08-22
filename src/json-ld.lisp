@@ -97,6 +97,10 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
                                          (cdr alist-cell)))
           (json-ld-etc obj)))
 
+(defmethod yason:encode ((obj json-ld-object) &optional (stream *standard-output))
+  (yason:with-output (stream)
+    (yason:encode-object obj)))
+
 
 
 ;;; CLOS definition
@@ -198,12 +202,14 @@ into a DEFCLASS format."
   "Helper-macro for DEFINE-JSON-CLOS-CLASS.
 This actually defines the YASON-encoder for a JSON-LD node-type.
 CLASS is the class-name; see DEFINE-JSON-TYPE’s docstring about DIRECT-SLOTS."
-  (append
-   `(defmethod yason:encode-slots progn ((obj ,class)))
-   (mapcar (lambda (slot)
-             `(when (slot-boundp obj ',(car slot))
-                (yason:encode-object-element ,(cadr slot) (slot-value obj ',(car slot)))))
-           direct-slots)))
+  `(progn
+     (defmethod yason:encode-slots progn ((obj ,class))
+       ,(append
+         `(progn)
+         (mapcar (lambda (slot)
+                   `(when (slot-boundp obj ',(car slot))
+                      (yason:encode-object-element ,(cadr slot) (slot-value obj ',(car slot)))))
+                 direct-slots)))))
 
 
 
