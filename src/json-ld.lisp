@@ -255,34 +255,27 @@ name, though it might be unresolved if context was unprovided or lacking."
 
 (defun parse (str)
   "Parse the JSON-LD document contained in STR."
-  (let ((ctx     (make-hash-table :test #'equal)) ; Parsed context: IRI→name,etc.
-        (rev-ctx (make-hash-table :test #'equal)) ; Inversed ctx: name→IRI
+  (let ((ctx     (make-hash-table :test #'equal)) ; Parsed context
         (parsed (yason:parse str)))
-    (values (parse-item parsed ctx rev-ctx)
+    (values (parse-item parsed ctx)
             ctx)))
 
-(defun parse-item (item &optional ctx rev-ctx)
+(defun parse-item (item &optional ctx)
   "Parse an individual ITEM of a YASON-decoded JSON-LD document."
   (typecase item
-    (hash-table (parse-table item ctx rev-ctx))
+    (hash-table (parse-table item ctx))
     (list       (mapcar (lambda (a) (parse-item a ctx)) item))
     (T          item)))
 
-(defun parse-table (table &optional ctx rev-ctx)
+(defun parse-table (table &optional ctx)
   "Parse a JSON “node object” (as decoded by YASON into a hash-TABLE."
   (let ((ctx (parse-context (gethash "@context" table) ctx)))
-    ;; Update our inverted context-table, so we can resolve property-names→IRIs.
-    (when (not (eq (hash-table-count rev-ctx)
-                   (hash-table-count ctx)))
-      (copy-hash-table-to ctx rev-ctx)
-      (invert-hash-table rev-ctx (lambda (val)
-                                   (getf val :id))))
     ;; Now, actually parse.
     (let* ((parsed-table (parse-table-inplace table ctx))
            (type         (identify-json-type table ctx))
            (type-def      (or (gethash type *json-types*)
                               (gethash "*"  *json-types*))))
-      (parse-table-into-object parsed-table type-def ctx rev-ctx))))
+      (parse-table-into-object parsed-table type-def ctx))))
 
 (defun parse-table-inplace (table ctx)
   "Expand a YASON-parsed JSON-LD node-object in TABLE. That is, replace all
@@ -306,12 +299,11 @@ CTX should be the parsed-context corresponding to the table."
    table)
   table)
 
-(defun parse-table-into-object (table type-def ctx rev-ctx)
+(defun parse-table-into-object (table type-def ctx)
   "Parse an expanded-form JSON-LD object (TABLE) into a CLOS object.
 TYPE-DEF is a type-definition list of the form found in *JSON-TYPES* and made
 by REGISTER-JSON-TYPE.
-CTX is the according parsed-context, and REV-CTX is the reversed
-(IRI → property-name) context."
+CTX is the according parsed-context."
   (let ((obj (make-instance (caar type-def))))
     (maphash
      (lambda (property value)
@@ -417,7 +409,10 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
          (cond ((and id (not parsed-id))
                 (push (cons term iri) unresolvable))
                (T
-                (setf (gethash term ctx) (list :id parsed-id :type type))))))
+                (setf (gethash term ctx)
+                      (list :id parsed-id :type type))
+                (setf (gethash (format nil ".~A" parsed-id) ctx)
+                      term)))))
      table)
     unresolvable))
 
@@ -517,33 +512,6 @@ returned."
 (defun http-get (uri &key headers)
   "Makes a GET request to URI, returning the resultant string."
   (dexador:get uri :headers headers :force-string 't))
-
-(defun invert-hash-table (table &optional tf)
-  "Return a copy of TABLE with the keys and values inverted.
-All values are the new keys for the old keys, and all old keys are…
-wait, I’m getting confused now. Oh, whatever, you know what’s up!
-
-Optionally, a TF function can be provided, which will be executed
-with the new key as its parameter, and whose return-value will be
-the key. Useful for sanitization!"
-  (let ((new-table (alexandria:copy-hash-table table)))
-    (maphash (lambda (old-key old-val)
-               (let ((new-key (if tf (funcall tf old-val) old-val)))
-                 (remhash old-key new-table)
-                 (setf (gethash new-key new-table) old-key)))
-             new-table)
-    new-table))
-
-(defun copy-hash-table-to (from to &optional (clobber nil))
-  "Shallowly copies the keys+values of hash-table FROM into TO.
-If CLOBBER is set, old-values in TO will be overwritten."
-  (maphash (lambda (key val)
-             (let ((in-to (gethash key to)))
-               (when (or (and clobber in-to)
-                         (not in-to))
-                     (setf (gethash key to) val))))
-           from)
-  to)
 
 (defun plist-keys (plist)
   "Return a list of keys in a property list."
