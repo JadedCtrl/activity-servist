@@ -37,7 +37,7 @@
 ;;; ————————————————————————————————————————
 (defmacro relative-pathname (path)
   "Return an absolute path adding the relative PATH to the system’s path."
-  `(asdf:system-relative-pathname :activity-servist/tests/activity-streams ,path))
+  `(asdf:system-relative-pathname :activity-servist/tests/activity-vocabulary ,path))
 
 (defmacro define-json-test (path tags)
   "Define a lisp-unit2 test for parsing of the given JSON file.

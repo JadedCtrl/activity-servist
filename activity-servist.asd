@@ -87,7 +87,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :description "Tests for all activity-servist subpacakges."
 
-  :depends-on (:activity-servist/tests/activity-streams
+  :depends-on (:activity-servist/tests/activity-vocabulary
                :activity-servist/tests/json-ld
                :activity-servist/tests/signatures
                :alexandria :lisp-unit2)
