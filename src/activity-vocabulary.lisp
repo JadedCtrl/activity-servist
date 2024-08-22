@@ -30,7 +30,7 @@
    :ordered-collection-page :organization :page :person :place :profile
    :question :read :reject :relationship :remove :service :tentative-accept
    :tentative-reject :tombstone :travel :undo :update :video :view
-   ;; Slots
+   ;; Accessors
    :activity-actor :activity-instrument :activity-object :activity-origin
    :activity-result :activity-target
    :collection-current :collection-first :collection-items :collection-last
@@ -55,152 +55,315 @@
 
 (in-package #:activity-servist/activity-vocabulary)
 
-(setq activity-servist/activity-streams:*default-class*
-      'activity-servist/activity-vocabulary:object)
-
-
-;;; Macros
-;;; ————————————————————————————————————————
-(defmacro defclass-w-accessors (name direct-superclasses slots &rest options)
-  "Identical to DEFCLASS, but with one convenience: A slot definition, if being
-simply a symbol, will default to a slot with an accessor and init-arg named after the
-symbol. The init-arg will be “:symbol”, and the accessor will be “classname-symbol”.
-For example, the following two forms are equivalent:
-    (defclass-w-accessors PERSON () (AGE
-                                     HEIGHT
-                                     (NAME :INIT-FORM “Unknown”)))
-    (defclass PERSON () ((AGE    :INIT-ARG :AGE    :ACCESSOR PERSON-AGE)
-                         (HEIGHT :INIT-ARG :HEIGHT :ACCESSOR PERSON-HEIGHT)
-                         (NAME   :INIT-FORM “Unknown”)))"
-  `(defclass ,name ,direct-superclasses
-     ,(mapcar
-       (lambda (slot)
-         (typecase slot
-           (list slot)
-           (t (list slot :accessor (intern (format nil "~A-~A" name slot))
-                         :initarg  (intern (symbol-name slot) "KEYWORD")
-                         :initform nil))))
-       slots)
-     ,@options))
-
-(defmacro defclass-empty-children (name direct-children)
-  "For each name in the list DIRECT-CHILDREN, a subclass of NAME will be created.
+(defmacro define-json-empty-types (superclass context &rest direct-children)
+  "For each list of DIRECT-CHILDREN, a “hollow” JSON subtype and CLOS subclass
+of SUPERCLASS will be created, with the given JSON-LD context CONTEXT.
 These new subclasses have no slots of its own — they will be empty derivatives
-of NAME."
+of SUPERCLASS.
+
+Items of DIRECT-CHILDREN should be of the form,
+   (CLASS-NAME “typeName” “Documenation-string describing the subclass.”)"
   (append
    '(progn)
-   (mapcar (lambda (a)
-             `(defclass ,a (,name) ()))
+   (mapcar (lambda (subclass-list)
+             (let ((class-name    (first  subclass-list))
+                   (type-name     (second subclass-list))
+                   (documentation (third  subclass-list)))
+               `(json-ld:define-json-type (,class-name ,type-name) (,superclass) ,context
+                  ()
+                  (:documentation ,documentation))))
            direct-children)))
 
 
 
 ;;; Core types
 ;;; ————————————————————————————————————————
-;; https://www.w3.org/ns/activitystreams#Object
-(defclass-w-accessors object (activity-servist/activity-streams:object)
-  (
-   attachment attributed-to audience bcc bto cc content context
-   duration end-time generator icon id image in-reply-to location
-   media-type name preview published replies start-time summary
-   tag to updated url))
-
 ;; https://www.w3.org/ns/activitystreams#Link
 ;; “summary” here isn’t real! It’s not a property Link should have (just
 ;; looking at Link’s properties), but it’s implied by the Mention example.
-(defclass-w-accessors link (activity-servist/activity-streams:object)
-  (height href hreflang media-type name preview rel summary width))
+(json-ld:define-json-type (link "Link") ()
+  "https://www.w3.org/ns/activitystreams"
+  ((height
+    "height"
+    :documentation "On a Link, specifies a hint as to the rendering height in device-independent pixels of the linked resource.")
+   (href
+    "href"
+    :documentation "The target resource pointed to by a Link.")
+   (hreflang
+    "hreflang"
+    :documentation "Hints as to the language used by the target resource. Value MUST be a [BCP47] Language-Tag.")
+   (media-type
+    "media-type"
+    :documentation "Identifies the MIME media type of the referenced resource.")
+   (name
+    "name"
+    :documentation "A simple, human-readable, plain-text name for the object. HTML markup MUST NOT be included. The name MAY be expressed using multiple language-tagged values. ")
+   (preview
+    "preview"
+    :documentation "Identifies an entity that provides a preview of this object. ")
+   (rel
+    "rel"
+    :documentation "A link relation associated with a Link. The value MUST conform to both the [HTML5] and [RFC5988] “link relation” definitions.
+In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0009), “LF” (U+000A), “FF” (U+000C), “CR” (U+000D) or “,” (U+002C) characters can be used as a valid link relation.")
+   (summary
+    "summary"
+    :documentation "A natural language summarization of the object encoded as HTML. Multiple language tagged summaries MAY be provided.")
+   (width
+    "width"
+    :documentation "Specifies a hint as to the rendering width in device-independent pixels of the linked resource.")))
+
 
 ;; https://www.w3.org/ns/activitystreams#Activity
-(defclass-w-accessors activity (object)
-  (actor instrument object origin result target))
+(json-ld:define-json-type (activity "Activity") (object)
+  "https://www.w3.org/ns/activitystreams"
+  ((actor
+    "actor"
+    :documentation "Describes one or more entities that either performed or are expected to perform the activity. Any single activity can have multiple actors. The actor MAY be specified using an indirect Link.")
+   (object
+    "object"
+    :documentation "Describes the direct object of the activity. For instance, in the activity “John added a movie to his wishlist”, the object of the activity is the movie added.")
+   (target
+    "target"
+    :documentation "Describes the indirect object, or target, of the activity. The precise meaning of the target is largely dependent on the type of action being described but will often be the object of the English preposition ”to”. For instance, in the activity “John added a movie to his wishlist”, the target of the activity is John's wishlist. An activity can have more than one target.")
+   (result
+    "result"
+    :documentation "Describes the result of the activity. For instance, if a particular action results in the creation of a new resource, the result property can be used to describe that new resource.")
+   (origin
+    "origin"
+    :documentation "Describes an indirect object of the activity from which the activity is directed. The precise meaning of the origin is the object of the English preposition “from”. For instance, in the activity “John moved an item to List B from List A”, the origin of the activity is “List A”.")
+   (instrument
+    "instrument"
+    :documentation "Identifies one or more objects used (or to be used) in the completion of an Activity."))
+  (:documentation "An Activity is a subtype of Object that describes some form of action that may happen, is currently happening, or has already happened. The Activity type itself serves as an abstract base type for all types of activities. It is important to note that the Activity type itself does not carry any specific semantics about the kind of action being taken."))
+
 
 ;; Should be ordinary Activity, sans `object`.
 ;; https://www.w3.org/ns/activitystreams#IntransitiveActivity
-(defclass intransitive-activity (activity) ())
+(json-ld:define-json-type (intransitive-activity "IntransitiveActivity") (activity)
+  "https://www.w3.org/ns/activitystreams"
+  ()
+  (:documentation "Instances of IntransitiveActivity are a subtype of Activity representing intransitive actions. The object property is therefore inappropriate for these activities."))
+
 
 ;; https://www.w3.org/ns/activitystreams#Collection
-(defclass-w-accessors collection (object)
-  (current first items last total-items))
+(json-ld:define-json-type (collection "Collection") (object)
+  "https://www.w3.org/ns/activitystreams"
+  ((total-items
+    "totalItems"
+    :documentation "A non-negative integer specifying the total number of objects contained by the logical view of the collection. This number might not reflect the actual number of items serialized within the Collection object instance.")
+   (current
+    "current"
+    :documentation "In a paged Collection, indicates the page that contains the most recently updated member items.")
+   (first
+    "first"
+    :documentation "In a paged Collection, indicates the furthest preceeding page of items in the collection. ")
+   (last
+    "last"
+    :documentation "In a paged Collection, indicates the furthest proceeding page of the collection.")
+   (items
+    "items"
+    :documentation "Identifies the items contained in a collection. The items might be ordered or unordered."))
+  (:documentation "A Collection is a subtype of Object that represents ordered or unordered sets of Object or Link instances."))
+
 
 ;; https://www.w3.org/ns/activitystreams#OrderedCollection
 ;; Funnily enough, “orderedItems” is actually a ghost! It’s only *implied*. :-P
 ;; https://jam.xwx.moe/notice/AjE1LkpLoBvWmDUmK8
-(defclass-w-accessors ordered-collection (collection)
-  (ordered-items))
+(json-ld:define-json-type (ordered-collection "OrderedCollection") (collection)
+  "https://www.w3.org/ns/activitystreams"
+  ((ordered-items
+    "orderedItems"
+    :documentation "Identifies the items contained in a collection. The items are necessarily ordered."))
+  (:documentation "A subtype of Collection in which members of the logical collection are assumed to always be strictly ordered."))
+
 
 ;; https://www.w3.org/ns/activitystreams#CollectionPage
-(defclass-w-accessors collection-page (collection)
-  (next part-of prev))
+(json-ld:define-json-type (collection-page "CollectionPage") (collection)
+  "https://www.w3.org/ns/activitystreams"
+  ((part-of
+    "partOf"
+    :documentation "Identifies the Collection to which a CollectionPage objects items belong.")
+   (next
+    "next"
+    :documentation "In a paged Collection, indicates the next page of items.")
+   (prev
+    "prev"
+    :documentation "In a paged Collection, identifies the previous page of items."))
+  (:documentation "Used to represent distinct subsets of items from a Collection."))
+
 
 ;; https://www.w3.org/ns/activitystreams#OrderedCollectionPage
-(defclass-w-accessors ordered-collection-page (collection-page ordered-collection)
-  (start-index))
+(json-ld:define-json-type (ordered-collection-page "OrderedCollectionPage") (collection-page ordered-collection)
+  "https://www.w3.org/ns/activitystreams"
+  ((start-index
+    "startIndex"
+    :documentation "A non-negative integer value identifying the relative position within the logical view of a strictly ordered collection."))
+  (:documentation "Used to represent ordered subsets of items from an OrderedCollection."))
 
 
 
 ;;; Extended Activity types
 ;;; ————————————————————————————————————————
-(defclass-empty-children activity
-  (accept add announce block create delete dislike flag follow ignore join leave
-        like listen move offer read reject remove travel undo update view))
+(define-json-empty-types activity "https://www.w3.org/ns/activitystreams"
+  (accept   "Accept"   "Indicates that the actor accepts the object. The target property can be used in certain circumstances to indicate the context into which the object has been accepted.")
+  (add      "Add"    "Indicates that the actor has added the object to the target. If the target property is not explicitly specified, the target would need to be determined implicitly by context. The origin can be used to identify the context from which the object originated.")
+  (create   "Create"   "Indicates that the actor has created the object.")
+  (delete   "Delete"   "Indicates that the actor has deleted the object. If specified, the origin indicates the context from which the object was deleted.")
+  (follow   "Follow"   "Indicates that the actor is “following” the object. Following is defined in the sense typically used within Social systems in which the actor is interested in any activity performed by or on the object. The target and origin typically have no defined meaning.")
+  (ignore   "Ignore"   "Indicates that the actor is ignoring the object. The target and origin typically have no defined meaning.")
+  (join     "Join"     "Indicates that the actor has joined the object. The target and origin typically have no defined meaning.")
+  (leave    "Leave"    "Indicates that the actor has left the object. The target and origin typically have no meaning.")
+  (like     "Like"     "Indicates that the actor likes, recommends or endorses the object. The target and origin typically have no defined meaning.")
+  (offer    "Offer"    "Indicates that the actor is offering the object. If specified, the target indicates the entity to which the object is being offered.")
+  (reject   "Reject"   "Indicates that the actor is rejecting the object. The target and origin typically have no defined meaning.")
+  (remove   "Remove"   "Indicates that the actor is removing the object. If specified, the origin indicates the context from which the object is being removed.")
+  (undo     "Undo"     "Indicates that the actor is undoing the object. In most cases, the object will be an Activity describing some previously performed action (for instance, a person may have previously “liked” an article but, for whatever reason, might choose to undo that like at some later point in time).
+The target and origin typically have no defined meaning.")
+  (update   "Update"   "Indicates that the actor has updated the object. Note, however, that this vocabulary does not define a mechanism for describing the actual set of modifications made to object.
+The target and origin typically have no defined meaning.")
+  (view     "View"     "Indicates that the actor has viewed the object.")
+  (listen   "Listen"   "Indicates that the actor has listened to the object.")
+  (read     "Read"     "Indicates that the actor has read the object.")
+  (move     "Move"     "Indicates that the actor has moved object from origin to target. If the origin or target are not specified, either can be determined by context.")
+  (travel   "Travel"   "Indicates that the actor is traveling to target from origin. Travel is an IntransitiveObject whose actor specifies the direct object. If the target or origin are not specified, either can be determined by context.")
+  (announce "Announce" "Indicates that the actor is calling the target's attention the object.
+The origin typically has no defined meaning.")
+  (flag     "Flag"     "Indicates that the actor is “flagging” the object. Flagging is defined in the sense common to many social platforms as reporting content as being inappropriate for any number of reasons.")
+  (dislike  "Dislike"  "Indicates that the actor dislikes the object."))
 
-(defclass arrive (intransitive-activity) ())
-(defclass ignore (block) ())
-(defclass invite (offer) ())
-(defclass question (intransitive-activity) ())
-(defclass tentative-accept (accept) ())
-(defclass tentative-reject (reject) ())
 
-(defclass-w-accessors question (intransitive-activity)
-  (any-of closed one-of))
+(json-ld:define-json-type (question "Question") (intransitive-activity)
+  "https://www.w3.org/ns/activitystreams"
+  ((one-of
+    "oneOf"
+    :documentation "Identifies an exclusive option for a Question. Use of oneOf implies that the Question can have only a single answer. To indicate that a Question can have multiple answers, use anyOf.")
+   (any-of
+    "anyOf"
+    :documentation "Identifies an inclusive option for a Question. Use of anyOf implies that the Question can have multiple answers. To indicate that a Question can have only one answer, use oneOf.")
+   (closed
+    "closed"
+    :documentation "Indicates that a question has been closed, and answers are no longer accepted."))
+  (:documentation "Represents a question being asked. Question objects are an extension of IntransitiveActivity. That is, the Question object is an Activity, but the direct object is the question itself and therefore it would not contain an object property.
+Either of the ANY-OF and ONE-OF properties MAY be used to express possible answers, but a Question object MUST NOT have both properties."))
+
+
+(json-ld:define-json-type (arrive "Arrive") (intransitive-activity)
+  "https://www.w3.org/ns/activitystreams"
+  ((arrive
+    "Arrive"
+    :documentation "Indicates that the actor has arrived at the location. The origin can be used to identify the context from which the actor originated. The target typically has no defined meaning."))
+  (:documentation "An IntransitiveActivity that indicates that the actor has arrived at the location. The origin can be used to identify the context from which the actor originated. The target typically has no defined meaning."))
+
+
+(json-ld:define-json-type (block "Block") (ignore)
+  "https://www.w3.org/ns/activitystreams"
+  ()
+  (:documentation "Indicates that the actor is blocking the object. Blocking is a stronger form of Ignore. The typical use is to support social systems that allow one user to block activities or content of other users. The target and origin typically have no defined meaning."))
+
+
+(json-ld:define-json-type (invite "Invite") (offer)
+  "https://www.w3.org/ns/activitystreams"
+  ()
+  (:documentation "A specialization of Offer in which the actor is extending an invitation for the object to the target."))
+
+
+(json-ld:define-json-type (tentative-accept "TentativeAccept") (accept)
+  "https://www.w3.org/ns/activitystreams"
+  ()
+  (:documentation "A specialization of Accept indicating that the acceptance is tentative."))
+
+
+(json-ld:define-json-type (tentative-reject "TentativeReject") (reject)
+  "https://www.w3.org/ns/activitystreams"
+  ()
+  (:documentation "A specialization of Reject indicating that the rejection is tentative."))
 
 
 
 ;;; Extended Actor types
 ;;; ————————————————————————————————————————
-(defclass-empty-children object
-  (application group organization person service))
+(define-json-empty-types object "https://www.w3.org/ns/activitystreams"
+  (application  "Application"  "Describes a software application.")
+  (group        "Group"        "Represents a formal or informal collective of Actors.")
+  (organization "Organization" "Represents an organization.")
+  (person       "Person"       "Represents an individual person.")
+  (service      "Service"      "Represents a service of any kind."))
 
 
 
 ;;; Extended Object types
 ;;; ————————————————————————————————————————
-(defclass-empty-children object
-  (article document event note))
+(define-json-empty-types object "https://www.w3.org/ns/activitystreams"
+  (article  "Article"  "Represents any kind of multi-paragraph written work.")
+  (document "Document" "Represents a document of any kind.")
+  (note     "Note"     "Represents a short written work typically less than a single paragraph in length.")
+  (event    "Event"    "Represents any kind of event."))
 
-(defclass-empty-children document
-  (audio image page video))
+
+(define-json-empty-types document "https://www.w3.org/ns/activitystreams"
+  (audio    "Audio"    "Represents an audio document of any kind.")
+  (image    "Image"    "An image document of any kind.")
+  (video    "Video"    "Represents a video document of any kind.")
+  (page     "Page"     "Represents a Web Page."))
+
 
 ;; https://www.w3.org/ns/activitystreams#Place
-(defclass-w-accessors place (object)
-  (accuracy altitude latitude longitude radius units))
+(json-ld:define-json-type (place "Place") (object)
+  "https://www.w3.org/ns/activitystreams"
+  ((accuracy
+    "accuracy"
+    :documentation "Indicates the accuracy of position coordinates on a Place objects. Expressed in properties of percentage. e.g. “94.0” means “94.0% accurate”.")
+   (altitude
+    "altitude"
+    :documentation "Indicates the altitude of a place. The measurement units is indicated using the units property. If units is not specified, the default is assumed to be “m” indicating meters.")
+   (latitude
+    "latitude"
+    :documentation "The latitude of a place.")
+   (longitude
+    "longitude"
+    :documentation "The longitude of a place.")
+   (radius
+    "radius"
+    :documentation "The radius from the given latitude and longitude for a Place. The units is expressed by the units property. If units is not specified, the default is assumed to be “m” indicating “meters”.")
+   (units
+    "units"
+    :documentation "Specifies the measurement units for the radius and altitude properties on a Place object. If not specified, the default is assumed to be “m” for “meters”."))
+  (:documentation "Represents a logical or physical location."))
+
 
 ;;  https://www.w3.org/ns/activitystreams#Profile
-(defclass-w-accessors profile (object)
-  (describes))
+(json-ld:define-json-type (profile "Profile") (object)
+  "https://www.w3.org/ns/activitystreams"
+  ((describes
+    "describes"
+    :documentation "The describes property identifies the object described by a Profile."))
+  (:documentation "A Profile is a content object that describes another Object, typically used to describe Actor Type objects. The describes property is used to reference the object being described by the profile."))
+
 
 ;; https://www.w3.org/ns/activitystreams#Relationship
-(defclass-w-accessors relationship (object)
-  (object relationship subject))
+(json-ld:define-json-type (relationship "Relationship") (object)
+  "https://www.w3.org/ns/activitystreams"
+  ((subject
+    "subject"
+    :documentation "On a Relationship object, the subject property identifies one of the connected individuals. For instance, for a Relationship object describing “John is related to Sally”, subject would refer to John.")
+   (relationship
+    "relationship"
+    :documentation "On a Relationship object, the relationship property identifies the kind of relationship that exists between subject and object."))
+  (:documentation "Describes a relationship between two individuals. The subject and object properties are used to identify the connected individuals."))
+
 
 ;; https://www.w3.org/ns/activitystreams#Tombstone
-(defclass-w-accessors tombstone (object)
-  (former-type deleted))
+(json-ld:define-json-type (tombstone "Tombstone") (object)
+  "https://www.w3.org/ns/activitystreams"
+  ((former-type
+    "formerType"
+    :documentation "The formerType property identifies the type of the object that was deleted.")
+   (deleted
+    "deleted"
+    :documentation "The deleted property is a timestamp for when the object was deleted."))
+  (:documentation "A Tombstone represents a content object that has been deleted. It can be used in Collections to signify that there used to be an object at this position, but it has been deleted."))
 
 
-
-;;; Extended Link types
-;;; ————————————————————————————————————————
-(defclass-empty-children link
-  (mention))
-
-
-
-;;; Defining YASON:ENCODE-SLOTS
-;;; ————————————————————————————————————————
-;; On-the-fly define YASON:ENCODE-SLOTS for each of our distinct AP classes.
-(as/as:define-class-encoders
-    (mapcar #'find-class
-            '(object link activity collection collection-page ordered-collection
-              ordered-collection-page place profile question relationship tombstone)))
+(json-ld:define-json-type (mention "Mention") (link) "https://www.w3.org/ns/activitystreams"
+  ()
+  (:documentation "A specialized Link that represents an @mention."))
