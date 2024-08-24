@@ -19,7 +19,10 @@
   (:use #:cl)
   (:nicknames "AS/JSON-LD" "JSON-LD")
   (:export
+   ;; Functions/Macros
    #:parse #:define-json-type
+   ;; Symbols
+   #:no-@context
    ;; Accessors
    #:json-ld-context #:json-ld-etc #:json-ld-id #:json-ld-type
    ;; Slots
@@ -79,10 +82,13 @@ If you would like to change @context on a class-level, override this method.
 If you would like to change it on an object-level, set the @CONTEXT slot."))
 
 (defmethod json-ld-context ((obj json-ld-object))
-  (or (slot-value obj '@context)
-      "https://www.w3.org/ns/activitystreams"))
+  (let ((slot-@context (slot-value obj '@context)))
+    (unless (eq slot-@context 'no-@context)
+      (or slot-@context
+          "https://www.w3.org/ns/activitystreams"))))
 
 (defmethod yason:encode-slots progn ((obj json-ld-object))
+  (flatten-contained-contexts obj)
   (let ((context (json-ld-context obj))
         (id      (json-ld-id obj))
         (type    (json-ld-type obj)))
@@ -247,10 +253,9 @@ name, though it might be unresolved if context was unprovided or lacking."
    (reduce (lambda (slots-a slots-b)
              (append slots-a slots-b))
            (mapcar (lambda (class-name)
-                     (let* ((type-name     (class-json-type-name class-name))
-                            (type-registry (gethash type-name *json-types*)))
-                       (if type-registry
-                           type-registry)))
+                     (let* ((type-def (class-json-type-definition class-name)))
+                       (when type-def
+                         (cdr type-def))))
                    direct-superclasses))))
 
 (defun parse (str)
@@ -334,6 +339,12 @@ JSON-type that best suits the object — using the types registered into
         if (eq class-name (caar registry))
           return iri))
 
+(defun class-json-type-definition (class-name)
+  "Return the type-definition from the the registry of JSON types (*JSON-TYPES*),
+based on a CLOS class-name. It is of the form,
+  ((CLASS-NAME TYPE-NAME) (SLOT-NAME PROPERTY-NAME) ⋯ (SLOT-NAME PROPERTY-NAME))"
+  (gethash (class-json-type-name class-name) *json-types*))
+
 
 
 ;;; Context-parsing
@@ -415,6 +426,72 @@ IRI values whose prefix hasn’t yet been parsed into CTX."
                       term)))))
      table)
     unresolvable))
+
+
+
+;;; Context-normalization
+;;; ————————————————————————————————————————
+(defun flatten-contained-contexts (obj)
+  "“Flattens” the @CONTEXTs of a JSON-LD object and the @CONTEXTs of any contained
+objects, recursively. That is, redundant @CONTEXT-definitions are removed — we
+try to concentrate everything in the top-level object’s @CONTEXT slot.
+This is useful for ensuring the same @CONTEXT doesn’t get output a million times
+during JSON-encoding with YASON:ENCODE."
+  (loop for subobj in (cdr (contained-json-objects obj))
+        do
+           (progn
+             (let ((old-context    (json-ld-context obj))
+                   (old-subcontext (json-ld-context subobj)))
+               (when (and old-subcontext
+                          (not (equal old-context old-subcontext)))
+                 (setf (slot-value obj '@context)
+                       (append (if (listp old-context)
+                                   old-context
+                                   (list old-context))
+                               old-subcontext))))
+             (setf (slot-value subobj '@context) 'no-@context))))
+
+(defun json-slot-values (obj)
+  "Return the values of all registered slots/properties of a JSON-LD-OBJECT.
+Unregistered slots that don’t get encoded/decoded are ignored."
+  (let* ((type-def  (class-json-type-definition (class-name (class-of obj))))
+         (slot-defs (cdr type-def)))
+    (remove-if
+     #'not
+     (append
+      (mapcar (lambda (slot-def)
+                (let* ((slot-name  (cadr slot-def)))
+                  (and (slot-exists-p obj slot-name)
+                       (slot-boundp obj slot-name)
+                       (slot-value obj slot-name))))
+              slot-defs)
+      (mapcar (lambda (etc-cons)
+                (cdr etc-cons))
+              (slot-value obj '.etc))))))
+
+(defun contained-json-objects (item)
+  "Given ITEM of arbitrary type, return all JSON-LD-OBJECTs contained within,
+recursively. Lists, hash-tables, and the slots of JSON-LD-OBJECTs are explored."
+  (typecase item
+    (cons           (reduce
+                     (lambda (a b)
+                       (append a b))
+                     (mapcar (lambda (a) (contained-json-objects a))
+                             item)))
+    (hash-table     (let ((ret '()))
+                      (maphash
+                       (lambda (k v)
+                         (setq ret
+                               (append ret (contained-json-objects v))))
+                       item)
+                      ret))
+    (json-ld-object (append
+                     (list item)
+                     (reduce
+                      (lambda (b c)
+                       (append b c))
+                      (mapcar (lambda (a) (contained-json-objects a))
+                              (json-slot-values item)))))))
 
 
 
