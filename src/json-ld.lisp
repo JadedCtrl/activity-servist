@@ -17,7 +17,7 @@
 
 (defpackage #:activity-servist/json-ld
   (:use #:cl)
-  (:nicknames "AS/JSON-LD" "JSON-LD")
+  (:nicknames "AS/JLD" "JSON-LD")
   (:export
    ;; Functions/Macros
    #:parse #:define-json-type

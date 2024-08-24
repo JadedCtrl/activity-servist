@@ -25,7 +25,7 @@
 (defun run ()
   "Run tests from all activity-servist subpackages."
   (activity-servist/tests/signatures:run)
-  (activity-servist/tests/activity-streams:run))
+  (activity-servist/tests/activity-vocabulary:run))
 
 (defun run-with-summary ()
   "Run tests with summary for all activity-servist subpackages."

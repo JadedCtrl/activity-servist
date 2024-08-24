@@ -51,21 +51,11 @@
 
 ;;; Tests
 ;;; —————————————————————————————————————
-(asdf:defsystem "activity-servist/tests/json-ld"
-  :version "0.0"
-  :license "AGPLv3"
-  :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for the the activity-servist/json-ld package."
-
-  :depends-on (:activity-servist/json-ld :alexandria :lisp-unit2)
-  :components ((:file "t/json-ld")))
-
-
 (asdf:defsystem "activity-servist/tests/activity-vocabulary"
   :version "0.0"
   :license "AGPLv3"
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
-  :description "Tests for the the activity-servist/activity-vocabulary package."
+  :description "Tests the activity-servist/activity-vocabulary package, and indirectly /json-ld."
 
   :depends-on (:activity-servist/activity-vocabulary :alexandria :lisp-unit2)
   :components ((:file "t/activity-vocabulary")))
@@ -88,10 +78,10 @@
   :description "Tests for all activity-servist subpacakges."
 
   :depends-on (:activity-servist/tests/activity-vocabulary
-               :activity-servist/tests/json-ld
                :activity-servist/tests/signatures
                :alexandria :lisp-unit2)
   :components ((:file "t/t")))
+
 
 ;; Following method tweaked from lisp-unit2’s documentation:
 ;; https://github.com/AccelerationNet/lisp-unit2/blob/master/README.md#asdf
@@ -100,6 +90,5 @@
      (eval (read-from-string (format nil "(~A:run-with-summary)" ',package)))))
 
 (define-asdf-testing activity-servist/tests/activity-vocabulary)
-(define-asdf-testing activity-servist/tests/json-ld)
 (define-asdf-testing activity-servist/tests/signatures)
 (define-asdf-testing activity-servist/tests)
