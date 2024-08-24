@@ -24,7 +24,8 @@
 
 (defun run ()
   "Run all ACTIVITY-VOCABULARY tests."
-  (lisp-unit2:run-tests :package :activity-servist/tests/activity-vocabulary))
+  (let ((json-ld:*default-json-type* "https://www.w3.org/ns/activitystreams#Object"))
+    (lisp-unit2:run-tests :package :activity-servist/tests/activity-vocabulary)))
 
 (defun run-with-summary ()
   "Run tests with summary for ACTIVITY-VOCABULARY."

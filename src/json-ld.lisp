@@ -23,6 +23,8 @@
    #:parse #:define-json-type
    ;; Symbols
    #:no-@context
+   ;; Globals
+   #:*default-json-type*
    ;; Accessors
    #:json-ld-context #:json-ld-etc #:json-ld-id #:json-ld-type
    ;; Slots
@@ -33,6 +35,13 @@
 
 ;;; Globals
 ;;; ————————————————————————————————————————
+(defvar *default-json-type* "*"
+  "When parsing JSON-LD, objects of unrecognized types will be assumed to be
+of this type. Should be a string, the IRI corresponding to a registered type.
+For example: “https://www.w3.org/ns/activitystreams#Object”
+
+The default value “*” refers to the base JSON-LD-OBJECT type.")
+
 (defvar *http-cache* (make-hash-table :test #'equal))
 (defvar *json-types* (make-hash-table :test #'equal))
 
@@ -277,9 +286,9 @@ name, though it might be unresolved if context was unprovided or lacking."
   (let ((ctx (parse-context (gethash "@context" table) ctx)))
     ;; Now, actually parse.
     (let* ((parsed-table (parse-table-inplace table ctx))
-           (type         (identify-json-type table ctx))
-           (type-def      (or (gethash type *json-types*)
-                              (gethash "*"  *json-types*))))
+           (type         (identify-json-type parsed-table ctx))
+           (type-def     (or (gethash type                *json-types*)
+                             (gethash *default-json-type* *json-types*))))
       (parse-table-into-object parsed-table type-def ctx))))
 
 (defun parse-table-inplace (table ctx)
