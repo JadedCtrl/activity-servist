@@ -83,10 +83,10 @@ Items of DIRECT-CHILDREN should be of the form,
 (json-ld::define-json-type (object "Object") () "https://www.w3.org/ns/activitystreams"
   ((@id
     "id"
-    :documentation "Provides the globally unique identifier for an Object or Link.")
+    :documentation "Provides the globally unique identifier for an Object.")
    (@type
     "type"
-    :documentation "Identifies the Object or Link type. Multiple values may be specified.")
+    :documentation "Identifies the Object type. Multiple values may be specified.")
    (attachment
     "attachment"
     :documentation "Identifies a resource attached or related to an object that potentially requires special handling. The intent is to provide a model that is at least semantically similar to attachments in email.")
@@ -176,7 +176,13 @@ The notion of “context” used is intentionally vague. The intended function i
 ;; looking at Link’s properties), but it’s implied by the Mention example.
 (json-ld:define-json-type (link "Link") ()
   "https://www.w3.org/ns/activitystreams"
-  ((height
+  ((@id
+    "id"
+    :documentation "Provides the globally unique identifier for a Link.")
+   (@type
+    "type"
+    :documentation "Identifies the Link type. Multiple values may be specified.")
+   (height
     "height"
     :documentation "On a Link, specifies a hint as to the rendering height in device-independent pixels of the linked resource.")
    (href
@@ -186,7 +192,7 @@ The notion of “context” used is intentionally vague. The intended function i
     "hreflang"
     :documentation "Hints as to the language used by the target resource. Value MUST be a [BCP47] Language-Tag.")
    (media-type
-    "media-type"
+    "mediaType"
     :documentation "Identifies the MIME media type of the referenced resource.")
    (name
     "name"
@@ -438,10 +444,13 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
   "https://www.w3.org/ns/activitystreams"
   ((subject
     "subject"
-    :documentation "On a Relationship object, the subject property identifies one of the connected individuals. For instance, for a Relationship object describing “John is related to Sally”, subject would refer to John.")
+    :documentation "The subject property identifies one of the connected individuals. For instance, for a Relationship object describing “John is related to Sally”, subject would refer to John.")
+   (object
+    "object"
+    :documentation "Describes the entity to which the subject is related.")
    (relationship
     "relationship"
-    :documentation "On a Relationship object, the relationship property identifies the kind of relationship that exists between subject and object."))
+    :documentation "The relationship property identifies the kind of relationship that exists between subject and object."))
   (:documentation "Describes a relationship between two individuals. The subject and object properties are used to identify the connected individuals."))
 
 
