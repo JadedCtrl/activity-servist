@@ -44,6 +44,7 @@ The default value “*” refers to the base JSON-LD-OBJECT type.")
 
 (defvar *http-cache* (make-hash-table :test #'equal))
 (defvar *json-types* (make-hash-table :test #'equal))
+(defvar *class-defs* (make-hash-table))
 
 
 
@@ -121,9 +122,10 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
 ;;; CLOS definition
 ;;; ————————————————————————————————————————
 (defmacro define-json-type (names direct-superclasses context direct-slots &rest options)
-  "Used to define a CLOS class and a JSON encoder/decoder for a JSON-LD node-type.
-An instance of class will be output, instead of a hash-table, when parsing JSON-LD
-with JSON-LD:PARSE. Instances of this class can be encoded into JSON with YASON:ENCODE.
+  "Used to define or update a CLOS class and a JSON encoder/decoder for a
+JSON-LD node-type. An instance of class will be output, instead of a hash-table,
+when parsing JSON-LD with JSON-LD:PARSE. Instances of this class can be encoded
+into JSON with YASON:ENCODE.
 
 NAMES is a pair with two values: The CLOS class-name, and the name used during
 encoding as @type’s value. If only the CLOS class-name is provided, @type will
@@ -153,8 +155,15 @@ By default, a slot will have an accessor named after the class and slot, like
 PLACE-RADIUS for the class PLACE and the slot RADIUS.
 Set :ACCESSOR to NIL to define no accessor at all.
 
-OPTIONS contains ordinary class options, in the format of DEFCLASS; for
-instance, :DOCUMENTATION.
+OPTIONS contains ordinary class options, in the format of DEFCLASS (for example,
+:DOCUMENTATION), with one exception: The :UPDATE option.
+
+If the :UPDATE class option is non-nil, then DIRECT-SLOTS will be considered an
+“update” to the class, and will be appended to any direct-slots defined during
+previous definitions of that class done with DEFINE-JSON-TYPE.
+This is for convenience, so that one doesn’t have to copy an entire class
+defintion over in order to add one or two slots (which is a common occurance
+in the ActivityPub landscape).
 
 Here is a brief example partially defining the “Place” type from ActivityStreams:
 
@@ -165,13 +174,26 @@ Here is a brief example partially defining the “Place” type from ActivityStr
                 :documentation “The latitude of a place.”)
      (longitude “longitude”
                 :documentation “The longitude of a place.”)))"
-  `(let ((json-class
-           (define-json-clos-class ,names
-               ,(or direct-superclasses `(json-ld-object))
-             ,direct-slots ,options)))
-     (define-json-type-encoder ,(car names) ,direct-slots)
-     (register-json-type ',names (or ',direct-superclasses '(json-ld-object)) ',direct-slots ,context)
-     json-class))
+  ;; If the definition is an :UPDATE, remove that from OPTIONS and merge the old
+  ;; slots with the new.
+  (let ((direct-slots (if (assoc :update options)
+                          (progn (setf options (remove-from-alist :update options))
+                                 (merge-alists direct-slots
+                                               (gethash (car names) *class-defs*)
+                                               't))
+                          direct-slots)))
+    ;; Save the direct-slots, in case of future :UPDATEs.
+    (setf (gethash (car names) *class-defs*) direct-slots)
+
+    ;; Now, actually define the class, encoder, etc…
+    `(let ((json-class
+             (define-json-clos-class ,names
+                 ,(or direct-superclasses `(json-ld-object))
+               ,direct-slots
+               ,options)))
+       (define-json-type-encoder ,(car names) ,direct-slots)
+       (register-json-type ',names (or ',direct-superclasses '(json-ld-object)) ',direct-slots ,context)
+       json-class)))
 
 (defmacro define-json-clos-class (names direct-superclasses direct-slots options)
   "Helper-macro for DEFINE-JSON-TYPE.
@@ -599,6 +621,23 @@ returned."
   "Makes a GET request to URI, returning the resultant string."
   (dexador:get uri :headers headers :force-string 't))
 
+(defun remove-from-alist (item alist)
+  "Removes the cell corresponding to ITEM from an association list."
+  (remove item alist
+          :test (lambda (key cell)
+                  (eq (car cell) key))))
+
+(defun merge-alists (a b &optional clobberp)
+  "Merge two association lists, adding all items of A to B not pre-existing in B.
+If CLOBBERP is set, pre-existing items of B will be overwritten regardless."
+  (loop for cell in a
+        do (let ((b-has-item-p (assoc (car cell) b)))
+             (cond ((and b-has-item-p clobberp)
+                    (setf (cdr (assoc (car cell) b)) (cdr cell)))
+                   ((not b-has-item-p)
+                    (alexandria:appendf b (list cell))))))
+  b)
+
 (defun plist-keys (plist)
   "Return a list of keys in a property list."
   (remove-if #'not
@@ -606,12 +645,12 @@ returned."
          for i from 0
          collect (when (evenp i) item))))
 
-(defun merge-plists (a b)
-  "Merge two property lists, favouring adding all properties of A to B not
-pre-existing in B."
+(defun merge-plists (a b &optional clobberp)
+  "Merge two property lists, adding all properties of A to B not pre-existing
+in B. If CLOBBERP is set, pre-existing properties of B will be overwritten."
   (let ((a-keys (plist-keys a))
         (b-keys (plist-keys b)))
     (loop for key in a-keys
-          do (when (not (find key b-keys))
+          do (when (or clobberp (not (find key b-keys)))
                (setf (getf b key) (getf a key))))
     b))
