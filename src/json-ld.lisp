@@ -25,6 +25,8 @@
    #:no-@context
    ;; Globals
    #:*default-json-type*
+   ;; Objects
+   #:json-ld-object
    ;; Accessors
    #:json-ld-context #:json-ld-etc #:json-ld-id #:json-ld-type
    ;; Slots
@@ -183,7 +185,7 @@ Here is a brief example partially defining the “Place” type from ActivityStr
                                                't))
                           direct-slots)))
     ;; Save the direct-slots, in case of future :UPDATEs.
-    (setf (gethash (car names) *class-defs*) direct-slots)
+    (setf (gethash (car names) json-ld::*class-defs*) direct-slots)
 
     ;; Now, actually define the class, encoder, etc…
     `(let ((json-class

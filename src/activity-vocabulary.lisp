@@ -81,10 +81,10 @@ Items of DIRECT-CHILDREN should be of the form,
 ;; https://www.w3.org/ns/activitystreams#Object
 ;; The root of all evil in the world.
 (json-ld::define-json-type (object "Object") () "https://www.w3.org/ns/activitystreams"
-  ((@id
+  ((json-ld:@id
     "id"
     :documentation "Provides the globally unique identifier for an Object.")
-   (@type
+   (json-ld:@type
     "type"
     :documentation "Identifies the Object type. Multiple values may be specified.")
    (attachment
