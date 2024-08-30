@@ -26,6 +26,17 @@
   :components ((:file "src/activity-vocabulary")))
 
 
+(asdf:defsystem "activity-servist/litepub"
+  :version "0.0"
+  :license "AGPLv3"
+  :description "A-S subpackage providing an expanded vocabulary."
+  :author "Jaidyn Ann <jadedctrl@posteo.at>"
+  :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
+
+  :depends-on ("activity-servist/activity-vocabulary")
+  :components ((:file "src/litepub")))
+
+
 (asdf:defsystem "activity-servist/json-ld"
   :version "0.0"
   :license "AGPLv3"
