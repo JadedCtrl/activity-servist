@@ -68,8 +68,8 @@ Seemingly may be set in the Activity modifying the Note, or the Note itself.")
 Potentially deprecated/very uncommon.")
    (list-message
     "list-message"))
-  (:documentation "An Activity is a subtype of Object that describes some form of action that may happen, is currently happening, or has already happened. The Activity type itself serves as an abstract base type for all types of activities. It is important to note that the Activity type itself does not carry any specific semantics about the kind of action being taken."
-   :update 't))
+  (:documentation "An Activity is a subtype of Object that describes some form of action that may happen, is currently happening, or has already happened. The Activity type itself serves as an abstract base type for all types of activities. It is important to note that the Activity type itself does not carry any specific semantics about the kind of action being taken.")
+  (:update 't))
 
 
 ;; https://schema.org/PropertyValue
@@ -93,8 +93,8 @@ Potentially deprecated/very uncommon.")
     :documentation "When an update is part of a distributed conversation, this is the URI of that conversation.
 Likely deprecated/highly uncommon."))
   (:documentation "Indicates that the actor has updated the object. Note, however, that this vocabulary does not define a mechanism for describing the actual set of modifications made to object.
-The target and origin typically have no defined meaning."
-   :update 't))
+The target and origin typically have no defined meaning.")
+  (:update 't))
 
 
 ;; https://codeberg.org/fediverse/fep/src/branch/main/fep/c0e0/fep-c0e0.md
@@ -123,8 +123,8 @@ The target and origin typically have no defined meaning."
     "capabilities"
     :documentation "Contains a hash-table of capability-names mapped to a boolean, marking this Person’s (server’s) support of capability.
 One known capabilitity-name is Pleroma’s “acceptsChatMessages”."))
-  (:documentation "Represents an individual person."
-   :update 't))
+  (:documentation "Represents an individual person.")
+  (:update 't))
 
 
 
@@ -153,8 +153,8 @@ It is, however, unclear which one will win out in the end. The implementer prefe
 Effectively equivalent to QUOTE-URL.
 One of QUOTE-URL (as:quoteUrl) or QUOTE-URI (fedibird:quoteUri) is to be deprecated, and the other ought be preferred.
 It is, however, unclear which one will win out in the end. The implementer prefers QUOTE-URL."))
-  (:documentation "Represents a short written work typically less than a single paragraph in length."
-   :update 't))
+  (:documentation "Represents a short written work typically less than a single paragraph in length.")
+  (:update 't))
 
 
 ;; https://docs-develop.pleroma.social/backend/development/ap_extensions/#chatmessages

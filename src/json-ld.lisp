@@ -178,15 +178,12 @@ Here is a brief example partially defining the “Place” type from ActivityStr
                 :documentation “The longitude of a place.”)))"
   ;; If the definition is an :UPDATE, remove that from OPTIONS and merge the old
   ;; slots with the new.
-  (let ((direct-slots (if (assoc :update options)
-                          (progn (setf options (remove-from-alist :update options))
-                                 (merge-alists direct-slots
-                                               (gethash (car names) *class-defs*)
-                                               't))
-                          direct-slots)))
-    ;; Save the direct-slots, in case of future :UPDATEs.
-    (setf (gethash (car names) json-ld::*class-defs*) direct-slots)
-
+  (let ((direct-slots
+          (if (assoc :update options)
+              (progn (setf options (remove-from-alist :update options))
+                     (merge-alists direct-slots
+                                   (gethash (car names) *class-defs*) 't))
+              direct-slots)))
     ;; Now, actually define the class, encoder, etc…
     `(let ((json-class
              (define-json-clos-class ,names
@@ -260,6 +257,10 @@ corresponding CLOS class) of a node."
   (let* ((ctx       (parse-context context))
          (type-iri  (getf (gethash (cadr names) ctx) :id))
          (type-name (or type-iri (cadr names))))
+    ;; Save the type’s direct-slots, in case of future :UPDATEs.
+    (setf (gethash (car names) *class-defs*)
+          direct-slots)
+    ;; Now actually save the JSON-type.
     (setf (gethash type-name *json-types*)
           (json-type-registry-list names direct-superclasses ctx direct-slots))))
 
