@@ -1,4 +1,4 @@
-;;;; activity-servist/tests/activity-vocabulary: Testing activity-vocabulary.
+;;;; activity-servist/tests/vocab/activity: Testing activity-vocabulary.
 
 ;; Copyright © 2024 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
@@ -15,17 +15,17 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage :activity-servist/tests/activity-vocabulary
+(defpackage :activity-servist/tests/vocab/activity
   (:use :cl :lisp-unit2)
-  (:nicknames "AS/T/AV")
+  (:nicknames "AS/T/V/AV")
   (:export :run :run-with-summary))
 
-(in-package :activity-servist/tests/activity-vocabulary)
+(in-package :activity-servist/tests/vocab/activity)
 
 (defun run ()
   "Run all ACTIVITY-VOCABULARY tests."
   (let ((json-ld:*default-json-type* "https://www.w3.org/ns/activitystreams#Object"))
-    (lisp-unit2:run-tests :package :activity-servist/tests/activity-vocabulary)))
+    (lisp-unit2:run-tests :package :activity-servist/tests/vocab/activity)))
 
 (defun run-with-summary ()
   "Run tests with summary for ACTIVITY-VOCABULARY."
@@ -38,7 +38,7 @@
 ;;; ————————————————————————————————————————
 (defmacro relative-pathname (path)
   "Return an absolute path adding the relative PATH to the system’s path."
-  `(asdf:system-relative-pathname :activity-servist/tests/activity-vocabulary ,path))
+  `(asdf:system-relative-pathname :activity-servist/tests/vocab/activity ,path))
 
 (defmacro define-json-test (path tags)
   "Define a lisp-unit2 test for parsing of the given JSON file.
@@ -92,4 +92,4 @@ Any nested hash-tables found as values are also sorted, recursively."
 (mapcar (lambda (file)
           (eval `(define-json-test ,file '(:activity-vocabulary))))
         (uiop:directory-files
-         (relative-pathname "t/activity-vocabulary/")))
+         (relative-pathname "t/vocab/activity/")))

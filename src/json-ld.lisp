@@ -44,9 +44,19 @@ For example: “https://www.w3.org/ns/activitystreams#Object”
 
 The default value “*” refers to the base JSON-LD-OBJECT type.")
 
-(defvar *http-cache* (make-hash-table :test #'equal))
-(defvar *json-types* (make-hash-table :test #'equal))
-(defvar *class-defs* (make-hash-table))
+(defvar *json-types*    (make-hash-table :test #'equal)
+  "Stores descriptions of each JSON-type, mapping type-IRI to class-name and property-name to slot-name.
+Used during encoding an object to JSON, for finding type/property-names from class/slot-names.
+Keys are the type-IRI (e.g., (“https://www.w3.org/ns/activitystreams#Accept”), and values are an irregular association list, of the form:
+  ((CLASS-NAME-SYMBOL . TYPE-NAME) (PROPERTY-IRI SLOT-NAME-SYMBOL . PROPERTY-NAME) ⋯)")
+
+(defvar *class-defs*    (make-hash-table)
+  "Stores the slot definitions of classes, stored directly from DEFINE-JSON-TYPE.
+Used for the :UPDATE feature of DEFINE-JSON-TYPE, so you can add a slot to a pre-existing class without having to redefine the old slots.")
+
+(defvar *http-cache*    (make-hash-table :test #'equal)
+  "Caches context-texts fetched over HTTP.
+Maps URLs to text-content, so we don’t have to download the same context again and again.")
 
 
 

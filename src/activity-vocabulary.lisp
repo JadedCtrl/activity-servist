@@ -1,4 +1,4 @@
-;;;; activity-vocabulary: Base classes for ActivityStreams.
+;;;; activity-vocabulary: Base vocabulary classes for ActivityStreams.
 
 ;; Copyright © 2024 Jaidyn Ann <jadedctrl@posteo.at>
 ;;
@@ -15,9 +15,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage #:activity-servist/activity-vocabulary
+(defpackage #:activity-servist/vocab/activity
   (:use #:cl)
-  (:nicknames "AS/AV" "ACTIVITY-VOCABULARY")
+  (:nicknames "AS/V/A" "ACTIVITY-VOCABULARY")
   (:shadow #:block #:delete #:ignore #:listen #:read #:remove)
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
@@ -53,7 +53,7 @@
    :relationship-object :relationship-relationship :relationship-subject
    :tombstone-former-type :tombstone-deleted))
 
-(in-package #:activity-servist/activity-vocabulary)
+(in-package #:activity-servist/vocab/activity)
 
 (defmacro define-json-empty-types (superclass context &rest direct-children)
   "For each list of DIRECT-CHILDREN, a “hollow” JSON subtype and CLOS subclass
@@ -176,10 +176,10 @@ The notion of “context” used is intentionally vague. The intended function i
 ;; looking at Link’s properties), but it’s implied by the Mention example.
 (json-ld:define-json-type (link "Link") ()
   "https://www.w3.org/ns/activitystreams"
-  ((@id
+  ((json-ld:@id
     "id"
     :documentation "Provides the globally unique identifier for a Link.")
-   (@type
+   (json-ld:@type
     "type"
     :documentation "Identifies the Link type. Multiple values may be specified.")
    (height

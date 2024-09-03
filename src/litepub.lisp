@@ -15,11 +15,11 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-(defpackage #:activity-servist/litepub
+(defpackage #:activity-servist/vocab/litepub
   (:use #:cl)
-  (:nicknames "AS/LP" "LITEPUB"))
+  (:nicknames "AS/V/LP" "LITEPUB"))
 
-(in-package #:activity-servist/litepub)
+(in-package #:activity-servist/vocab/litepub)
 
 
 ;;; Globals
@@ -38,7 +38,7 @@ Defaults to a copy at jam.xwx.moe — because why not? ¯\_(ツ)_/¯")
   ()
   (:documentation "The base class used for Litepub objects."))
 
-(json-ld:define-json-type (as/av:object "Object") (as/jld::json-ld-object litepub-object) *litepub-uri*
+(json-ld:define-json-type (as/v/a:object "Object") (as/jld::json-ld-object litepub-object) *litepub-uri*
   ((atom-uri
     "atomUri"
     :documentation "A string containing a URI to an Atom-feed alternative representation of an object.
@@ -60,7 +60,7 @@ Seemingly may be set in the Activity modifying the Note, or the Note itself.")
   (:update 't))
 
 
-(json-ld:define-json-type (as/av:activity "Activity") (as/av:object) *litepub-uri*
+(json-ld:define-json-type (as/v/a:activity "Activity") (as/v/a:object) *litepub-uri*
   (;; https://blog.dereferenced.org/leveraging-json-ld-compound-typing-for-behavioural-hinting-in-activitypub
    (invisible
     "invisible"
@@ -86,7 +86,7 @@ Potentially deprecated/very uncommon.")
 
 ;;; Extended Activity types
 ;;; ————————————————————————————————————————
-(json-ld:define-json-type (as/av:update "Update") (as/av:activity) *litepub-uri*
+(json-ld:define-json-type (as/v/a:update "Update") (as/v/a:activity) *litepub-uri*
   (;; https://ostatus.github.io/spec/OStatus%201.0%20Draft%202.html#rfc.section.6
    (conversation
     "conversation"
@@ -98,7 +98,7 @@ The target and origin typically have no defined meaning.")
 
 
 ;; https://codeberg.org/fediverse/fep/src/branch/main/fep/c0e0/fep-c0e0.md
-(json-ld:define-json-type (emoji-react "EmojiReact") (as/av:like) *litepub-uri*
+(json-ld:define-json-type (emoji-react "EmojiReact") (as/v/a:like) *litepub-uri*
   ()
   (:documentation "This activity is similar to Like activity. In addition to standard properties of Like activity, EmojiReact activity MUST have a content property. Reaction content MUST be either a single unicode grapheme, or a shortcode of a custom emoji. If custom emoji is used, EmojiReact activity MUST have a tag property containing a single Emoji object."))
 
@@ -106,7 +106,7 @@ The target and origin typically have no defined meaning.")
 
 ;;; Extended Actor types
 ;;; ————————————————————————————————————————
-(json-ld:define-json-type (as/av:person "Person") (as/av:object) *litepub-uri*
+(json-ld:define-json-type (as/v/a:person "Person") (as/v/a:object) *litepub-uri*
   (;; https://docs.joinmastodon.org/spec/activitypub/#discoverable
    (public-key
     "publicKey"
@@ -135,12 +135,12 @@ One known capabilitity-name is Pleroma’s “acceptsChatMessages”."))
 ;;; Extended Object types
 ;;; ————————————————————————————————————————
 ;; https://docs.joinmastodon.org/spec/activitypub/#Emoji
-(json-ld:define-json-type (emoji "Emoji") (as/av:object) *litepub-uri*
+(json-ld:define-json-type (emoji "Emoji") (as/v/a:object) *litepub-uri*
   ()
   (:documentation "Represents a custom-emoji, with a shortcode (NAME), ID, and ICON (containing MEDIA-TYPE and URL)."))
 
 
-(json-ld:define-json-type (as/av:note "Note") (as/av:object) *litepub-uri*
+(json-ld:define-json-type (as/v/a:note "Note") (as/v/a:object) *litepub-uri*
   (;; https://misskey-hub.net/ns#_misskey_quote
    (quote-url
     "quoteUrl"
@@ -162,7 +162,7 @@ It is, however, unclear which one will win out in the end. The implementer prefe
 
 
 ;; https://docs-develop.pleroma.social/backend/development/ap_extensions/#chatmessages
-(json-ld:define-json-type (chat-message "ChatMessage") (as/av:note) *litepub-uri*
+(json-ld:define-json-type (chat-message "ChatMessage") (as/v/a:note) *litepub-uri*
   ()
   (:documentation "Represents a private and one-on-one chat-message.
 Similar to Notes in creation and use, but TO may contain only one recipient.
@@ -174,12 +174,12 @@ Potentially very uncommon — it is used by at least Pleroma."))
 Will set/get the value of either QUOTE-URL or QUOTE-URI, depending on which is currently in use.
 In case of doubt, QUOTE-URL is preferred."))
 
-(defmethod note-quote-url ((obj as/av:note))
+(defmethod note-quote-url ((obj as/v/a:note))
   (or (and (slot-boundp note 'quote-url) (slot-value note 'quote-url))
       (and (slot-boundp note 'quote-uri) (slot-value note 'quote-uri))))
 
 (defgeneric (setf note-quote-url) (obj value))
-(defmethod (setf note-quote-url) ((obj as/av:note) value)
+(defmethod (setf note-quote-url) ((obj as/v/a:note) value)
   (if (slot-boundp note 'quote-uri)
       (setf (slot-value note 'quote-uri) value)
       (setf (slot-value note 'quote-url) value)))
@@ -189,6 +189,6 @@ In case of doubt, QUOTE-URL is preferred."))
 ;;; Extended Link types
 ;;; ————————————————————————————————————————
 ;; https://docs.joinmastodon.org/spec/activitypub/#Hashtag
-(json-ld:define-json-type (hashtag "Hashtag") (as/av:link litepub-object) *litepub-uri*
+(json-ld:define-json-type (hashtag "Hashtag") (as/v/a:link litepub-object) *litepub-uri*
   ()
   (:documentation "Similar to Mentions, a Hashtag is used to link a post to given topics. Should be stored in a TAG slot, and contain NAME (#hashtag) and HREF (link to a server’s hashtag listing)."))
