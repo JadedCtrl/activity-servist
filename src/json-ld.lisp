@@ -61,12 +61,10 @@ The method JSON-LD-CONTEXT is how the contents of encoded @context is
 determined; to change a class’es default/calculated @context, override that
 method. This slot is for changing a specific object’s @context.")
    (@id
-    :initform nil
     :accessor json-ld-id
     :documentation
     "Provides the globally unique identifier for an object.")
    (@type
-    :initform nil
     :accessor json-ld-type
     :documentation
     "Identifies the type of an object. Used to determine the corresponding CLOS-object.")
@@ -101,15 +99,25 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
 
 (defmethod yason:encode-slots progn ((obj json-ld-object))
   (flatten-contained-contexts obj)
-  (let ((context (json-ld-context obj))
-        (id      (json-ld-id obj))
-        (type    (json-ld-type obj)))
-   (when context
-     (yason:encode-object-element "@context" (json-ld-context obj)))
-   (when id
-     (yason:encode-object-element "@id"      (json-ld-id obj)))
-   (when type
-     (yason:encode-object-element "@type"    (json-ld-type obj))))
+  ;; We only want to encode @context, @id, and @type if the child class doesn’t
+  ;; have its own alias for them.
+  (flet ((aliased-prop-p (property-name type-def)
+           (not (equal property-name
+                       (cddr (assoc property-name type-def :test #'equal))))))
+    (let* ((class-name   (class-name (class-of obj)))
+           (type-def     (cdr (class-json-type-definition class-name)))
+           (no-context-p (aliased-prop-p "@context" type-def))
+           (no-id-p      (aliased-prop-p "@id" type-def))
+           (no-type-p    (aliased-prop-p "@type" type-def))
+           (context      (json-ld-context obj))
+           (id           (and (slot-boundp obj '@id)   (json-ld-id obj)))
+           (type         (and (slot-boundp obj '@type) (json-ld-type obj))))
+      (when (and context (not no-context-p))
+        (yason:encode-object-element "@context" context))
+      (when (and id (not no-id-p))
+        (yason:encode-object-element "@id"      id))
+      (when (and type (not no-type-p))
+        (yason:encode-object-element "@type"    type))))
   (mapcar (lambda (alist-cell)
             (yason:encode-object-element (car alist-cell)
                                          (cdr alist-cell)))
@@ -269,31 +277,36 @@ corresponding CLOS class) of a node."
   (TYPE-IRI (PROPERTY-NAME SLOT-NAME) ⋯ (PROPERTY-NAME SLOT-NAME))
 … where TYPE-IRI is the (hopefully) fully-resolved IRI form of the node-type’s
 name, though it might be unresolved if context was unprovided or lacking."
-  (append
-   ;; The class-name and type-name.
-   (list (cons (car names) (cadr names)))
-   ;; Add the class’es direct slots.
-   (mapcar
-    (lambda (slot)
-      (when (cadr slot)
-        (let* ((property-name (cadr slot))
-               (slot-name     (car slot))
-               (ctx-item      (gethash property-name parsed-context))
-               (url           (or (getf ctx-item :id)
-                                  property-name)))
-          (cons url (cons slot-name property-name)))))
-    direct-slots)
-   ;; Add the slots of parent-classes.
-   (reduce (lambda (slots-a slots-b)
-             (append slots-a slots-b))
-           (mapcar (lambda (class-name)
-                     (let* ((type-def (class-json-type-definition class-name)))
-                       (when type-def
-                         (cdr type-def))))
-                   direct-superclasses))))
+  (remove-duplicates
+   (append
+    ;; The class-name and type-name.
+    (list (cons (car names) (cadr names)))
+    ;; Add the class’es direct slots.
+    (mapcar
+     (lambda (slot)
+       (when (cadr slot)
+         (let* ((property-name (cadr slot))
+                (slot-name     (car slot))
+                (ctx-item      (gethash property-name parsed-context))
+                (url           (or (getf ctx-item :id)
+                                   property-name)))
+           (cons url (cons slot-name property-name)))))
+     direct-slots)
+    ;; Add the slots of parent-classes.
+    (reduce (lambda (slots-a slots-b)
+              (append slots-a slots-b))
+            (mapcar (lambda (class-name)
+                      (let* ((type-def (class-json-type-definition class-name)))
+                        (when type-def
+                          (cdr type-def))))
+                    direct-superclasses)))
+   :test (lambda (a b) (equal (car a) (car b)))
+   :from-end 't))
 
-(defun parse (str)
-  "Parse the JSON-LD document contained in STR."
+(defun parse (str &optional always-object)
+  "Parse the JSON-LD document contained in STR.
+If ALWAYS-OBJECT is non-nil, even invalid JSON-LD objects (which would normally be
+parsed into hash-tables) will be parsed into CLOS objects."
   (let ((ctx     (make-hash-table :test #'equal)) ; Parsed context
         (parsed (yason:parse str)))
     (values (parse-item parsed ctx)
