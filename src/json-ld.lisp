@@ -309,6 +309,8 @@ If ALWAYS-OBJECT is non-nil, even invalid JSON-LD objects (which would normally 
 parsed into hash-tables) will be parsed into CLOS objects."
   (let ((ctx     (make-hash-table :test #'equal)) ; Parsed context
         (parsed (yason:parse str)))
+    (when always-object
+      (setf (gethash ".always-object" ctx) 't))
     (values (parse-item parsed ctx)
             ctx)))
 
@@ -326,8 +328,11 @@ parsed into hash-tables) will be parsed into CLOS objects."
     (let* ((parsed-table (parse-table-inplace table ctx))
            (type         (identify-json-type parsed-table ctx))
            (type-def     (or (gethash type                *json-types*)
-                             (gethash *default-json-type* *json-types*))))
-      (parse-table-into-object parsed-table type-def ctx))))
+                             (gethash *default-json-type* *json-types*)))
+           (valid-object (or type (gethash "@id" table))))
+      (if (or valid-object (gethash ".always-object" ctx))
+          (parse-table-into-object parsed-table type-def ctx)
+          parsed-table))))
 
 (defun parse-table-inplace (table ctx)
   "Expand a YASON-parsed JSON-LD node-object in TABLE. That is, replace all
