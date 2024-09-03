@@ -108,6 +108,10 @@ The target and origin typically have no defined meaning.")
 ;;; ————————————————————————————————————————
 (json-ld:define-json-type (as/av:person "Person") (as/av:object) *litepub-uri*
   (;; https://docs.joinmastodon.org/spec/activitypub/#discoverable
+   (public-key
+    "publicKey"
+    :documentation "Contains an object representing a definition of the user’s public key, used for HTTP signatures.
+Generally contains the properties “id”, “owner”, “publicKeyPem”.")
    (discoverable
     "discoverable"
     :documentation "A boolean value reflecting whether or not a profile should be publically discoverable.")
