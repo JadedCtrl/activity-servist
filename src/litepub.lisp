@@ -44,25 +44,51 @@ Defaults to a copy at jam.xwx.moe — because why not? ¯\_(ツ)_/¯")
     :documentation "A string containing a URI to an Atom-feed alternative representation of an object.
 Potentially deprecated/very uncommon.")
    ;; https://docs.joinmastodon.org/spec/activitypub/#sensitive
-   (sensitive
+   (sensitivep
     "sensitive"
     :documentation "A boolean value, representing whether or not an Object’s content is not necessarily generally appropriate. This will often hide the content, to some clients. SUMMARY will often be displayed in place of the content.")
    (non-anonymous
     "nonAnonymous"
     :documentation "I had no luck finding what this might mean, to be honest. ¯\_(ツ)_/¯
 Likely deprecated/highly uncommon.")
-   (direct-message
+   (direct-message-p
     "directMessage"
     :documentation "A boolean value commonly used to mark a Note as non-public, a direct message to be visible only to those in TO.
 Seemingly may be set in the Activity modifying the Note, or the Note itself.")
    (former-representations
-    "formerRepresentations"))
+    "formerRepresentations")
+
+   ;; Actor properties
+   (public-key
+    "publicKey"
+    :documentation "Contains an object representing a definition of the Actor’s public key, used for HTTP signatures.
+Generally contains the properties “id”, “owner”, “publicKeyPem”.")
+   ;; https://docs.joinmastodon.org/spec/activitypub/#discoverable
+   (discoverablep
+    "discoverable"
+    :accessor actor-discoverable-p
+    :documentation "A boolean value reflecting whether or not an Actor’s profile should be publically discoverable.")
+   ;; https://docs.joinmastodon.org/spec/activitypub/#as
+   (manually-approves-followers-p
+    "manuallyApprovesFollowers"
+    :accessor actor-manually-approves-followers-p
+    :documentation "A boolean value, communicating whether or not an Actor screens follow-requests.")
+   ;; https://docs.joinmastodon.org/spec/activitypub/#Move
+   (also-known-as
+    "alsoKnownAs"
+    :accessor actor-also-known-as
+    :documentation "When moving between two accounts, the old account sets this property to the URI of the new account.")
+   (capabilities
+    "capabilities"
+    :accessor actor-capabilities
+    :documentation "Contains a hash-table of capability-names mapped to a boolean, marking this Actor’s (server’s) support of capability.
+One known capabilitity-name is Pleroma’s “acceptsChatMessages”."))
   (:update 't))
 
 
 (json-ld:define-json-type (as/v/a:activity "Activity") (as/v/a:object) *litepub-uri*
   (;; https://blog.dereferenced.org/leveraging-json-ld-compound-typing-for-behavioural-hinting-in-activitypub
-   (invisible
+   (invisiblep
     "invisible"
     :documentation "A boolean value hinting as to whether or not the result of an Activity should be invisible to the end-user.
 Potentially deprecated/very uncommon.")
@@ -101,34 +127,6 @@ The target and origin typically have no defined meaning.")
 (json-ld:define-json-type (emoji-react "EmojiReact") (as/v/a:like) *litepub-uri*
   ()
   (:documentation "This activity is similar to Like activity. In addition to standard properties of Like activity, EmojiReact activity MUST have a content property. Reaction content MUST be either a single unicode grapheme, or a shortcode of a custom emoji. If custom emoji is used, EmojiReact activity MUST have a tag property containing a single Emoji object."))
-
-
-
-;;; Extended Actor types
-;;; ————————————————————————————————————————
-(json-ld:define-json-type (as/v/a:person "Person") (as/v/a:object) *litepub-uri*
-  (;; https://docs.joinmastodon.org/spec/activitypub/#discoverable
-   (public-key
-    "publicKey"
-    :documentation "Contains an object representing a definition of the user’s public key, used for HTTP signatures.
-Generally contains the properties “id”, “owner”, “publicKeyPem”.")
-   (discoverable
-    "discoverable"
-    :documentation "A boolean value reflecting whether or not a profile should be publically discoverable.")
-   ;; https://docs.joinmastodon.org/spec/activitypub/#as
-   (manually-approves-followers
-    "manuallyApprovesFollowers"
-    :documentation "A boolean value, communicating whether or not a profile screens follow-requests.")
-   ;; https://docs.joinmastodon.org/spec/activitypub/#Move
-   (also-known-as
-    "alsoKnownAs"
-    :documentation "When moving between two accounts, the old account sets this property to the URI of the new account.")
-   (capabilities
-    "capabilities"
-    :documentation "Contains a hash-table of capability-names mapped to a boolean, marking this Person’s (server’s) support of capability.
-One known capabilitity-name is Pleroma’s “acceptsChatMessages”."))
-  (:documentation "Represents an individual person.")
-  (:update 't))
 
 
 
