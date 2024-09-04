@@ -339,8 +339,8 @@ parsed into hash-tables) will be parsed into CLOS objects."
            (type         (identify-json-type parsed-table ctx))
            (type-def     (or (gethash type                *json-types*)
                              (gethash *default-json-type* *json-types*)))
-           (valid-object (or type (gethash "@id" table))))
-      (if (or valid-object (gethash ".always-object" ctx))
+           (valid-object-p type))
+      (if (or valid-object-p (gethash ".always-object" ctx))
           (parse-table-into-object parsed-table type-def ctx)
           parsed-table))))
 
