@@ -17,7 +17,7 @@
 
 (defpackage :activity-servist/tests/vocab/activity
   (:use :cl :lisp-unit2)
-  (:nicknames "AS/T/V/AV")
+  (:nicknames "AS/T/V/A")
   (:export :run :run-with-summary))
 
 (in-package :activity-servist/tests/vocab/activity)

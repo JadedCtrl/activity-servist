@@ -17,7 +17,7 @@
 
 (defpackage #:activity-servist/vocab/activity
   (:use #:cl)
-  (:nicknames "AS/V/A" "ACTIVITY-VOCABULARY")
+  (:nicknames "AS/V/A" "ACTIVITY-VOCABULARY" "ACTIVITY")
   (:shadow #:block #:delete #:ignore #:listen #:read #:remove)
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
@@ -55,11 +55,11 @@
 
 (in-package #:activity-servist/vocab/activity)
 
-(defmacro define-json-empty-types (superclass context &rest direct-children)
+(defmacro define-json-empty-types (superclasses context &rest direct-children)
   "For each list of DIRECT-CHILDREN, a “hollow” JSON subtype and CLOS subclass
-of SUPERCLASS will be created, with the given JSON-LD context CONTEXT.
+ofE SUPERCLASSES will be created, with the given JSON-LD context CONTEXT.
 These new subclasses have no slots of its own — they will be empty derivatives
-of SUPERCLASS.
+of SUPERCLASSES.
 
 Items of DIRECT-CHILDREN should be of the form,
    (CLASS-NAME “typeName” “Documenation-string describing the subclass.”)"
@@ -69,7 +69,7 @@ Items of DIRECT-CHILDREN should be of the form,
              (let ((class-name    (first  subclass-list))
                    (type-name     (second subclass-list))
                    (documentation (third  subclass-list)))
-               `(json-ld:define-json-type (,class-name ,type-name) (,superclass) ,context
+               `(json-ld:define-json-type (,class-name ,type-name) ,superclasses ,context
                   ()
                   (:documentation ,documentation))))
            direct-children)))
@@ -166,9 +166,57 @@ The notion of “context” used is intentionally vague. The intended function i
     :documentation "Identifies the MIME media type of the value of the content property. If not specified, the content property is assumed to contain text/html content.")
    (duration
     "duration"
-    :documentation "When the object describes a time-bound resource, such as an audio or video, a meeting, etc, the duration property indicates the object's approximate duration. The value MUST be expressed as an xsd:duration as defined by [ xmlschema11-2], section 3.3.6 (e.g. a period of 5 seconds is represented as “PT5S”)."))
+    :documentation "When the object describes a time-bound resource, such as an audio or video, a meeting, etc, the duration property indicates the object's approximate duration. The value MUST be expressed as an xsd:duration as defined by [ xmlschema11-2], section 3.3.6 (e.g. a period of 5 seconds is represented as “PT5S”).")
+
+   ;; Required actor slots
+   (inbox
+    "inbox"
+    :accessor actor-inbox
+    :documentation "A reference to an OrderedCollection comprised of all the messages received by the actor.")
+   (outbox
+    "outbox"
+    :accessor actor-outbox
+    :documentation "An OrderedCollection comprised of all the messages produced by the actor.")
+   (following
+    "following"
+    :accessor actor-following
+    :documentation "A link to a collection of the actors that this actor is following.")
+   (followers
+    "followers"
+    :accessor actor-followers
+    :documentation "A link to a collection of the actors that follow this actor.")
+
+   ;; Optional Actor slots
+   (liked
+    "liked"
+    :accessor actor-liked
+    :documentation "A link to a collection of objects this actor has liked.")
+   (streams
+    "streams"
+    :accessor actor-streams
+    :documentation "A list of supplementary Collections which may be of interest.")
+   (preferred-username
+    "preferredUsername"
+    :accessor actor-preferred-username
+    :documentation "A short username which may be used to refer to the actor, with no uniqueness guarantees.")
+   (endpoints
+    "endpoints"
+    :accessor actor-endpoints
+    :documentation "A JSON object which maps additional (typically server/domain-wide) endpoints which may be useful either for this actor or someone referencing this actor. This mapping may be nested inside the actor document as the value or may be a link to a JSON-LD document with these properties.
+May include the properties “proxyUrl”, “oauthAuthorizationEndpoint”, “oauthTokenEndpoint”, “provideClientKey”, “signClientKey”, and “sharedInbox”.
+See the spec for details on these properties: https://www.w3.org/TR/activitypub/#proxyUrl"))
+
+  ;; Class docstring
   (:documentation
    "Describes an object of any kind. The Object type serves as the base type for most of the other kinds of objects defined in the Activity Vocabulary, including other Core types such as Activity, IntransitiveActivity, Collection and OrderedCollection."))
+
+
+;; https://www.w3.org/TR/activitypub/#x4-actors
+;; A dummy ACTOR class, for convenience sake.
+(defclass actor ()
+  ()
+  (:documentation "A dummy-class that represents an Actor ActivityPub object.
+There is, in reality, no “Actor” supertype in ActivityPub; but it might be useful in practice to treat all Actor-subtypes similarly in some cases, like method definition. Hence the existence of this class."))
 
 
 ;; https://www.w3.org/ns/activitystreams#Link
@@ -303,7 +351,7 @@ In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0
 
 ;;; Extended Activity types
 ;;; ————————————————————————————————————————
-(define-json-empty-types activity "https://www.w3.org/ns/activitystreams"
+(define-json-empty-types (activity) "https://www.w3.org/ns/activitystreams"
   (accept   "Accept"   "Indicates that the actor accepts the object. The target property can be used in certain circumstances to indicate the context into which the object has been accepted.")
   (add      "Add"    "Indicates that the actor has added the object to the target. If the target property is not explicitly specified, the target would need to be determined implicitly by context. The origin can be used to identify the context from which the object originated.")
   (create   "Create"   "Indicates that the actor has created the object.")
@@ -381,7 +429,7 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 
 ;;; Extended Actor types
 ;;; ————————————————————————————————————————
-(define-json-empty-types object "https://www.w3.org/ns/activitystreams"
+(define-json-empty-types (object actor) "https://www.w3.org/ns/activitystreams"
   (application  "Application"  "Describes a software application.")
   (group        "Group"        "Represents a formal or informal collective of Actors.")
   (organization "Organization" "Represents an organization.")
@@ -392,14 +440,14 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 
 ;;; Extended Object types
 ;;; ————————————————————————————————————————
-(define-json-empty-types object "https://www.w3.org/ns/activitystreams"
+(define-json-empty-types (object) "https://www.w3.org/ns/activitystreams"
   (article  "Article"  "Represents any kind of multi-paragraph written work.")
   (document "Document" "Represents a document of any kind.")
   (note     "Note"     "Represents a short written work typically less than a single paragraph in length.")
   (event    "Event"    "Represents any kind of event."))
 
 
-(define-json-empty-types document "https://www.w3.org/ns/activitystreams"
+(define-json-empty-types (document) "https://www.w3.org/ns/activitystreams"
   (audio    "Audio"    "Represents an audio document of any kind.")
   (image    "Image"    "An image document of any kind.")
   (video    "Video"    "Represents a video document of any kind.")
