@@ -171,8 +171,7 @@ SLOT-OPTIONS are key/value pairs in the format of DEFCLASS’es slot-options.
 Keywords such as :INITFORM, :DOCUMENTATION, etc. can be used.
 There is one keyword with behavior unlike DEFCLASS, however — :ACCESSOR.
 
-By default, a slot will have an accessor named after the class and slot, like
-PLACE-RADIUS for the class PLACE and the slot RADIUS.
+By default, a slot will have an accessor simply named after the slot.
 Set :ACCESSOR to NIL to define no accessor at all.
 
 OPTIONS contains ordinary class options, in the format of DEFCLASS (for example,
@@ -232,12 +231,12 @@ See DEFINE-JSON-TYPE’s docstring for a description of parameters."
   "Return DEFCLASS-format slot options from DEFINE-JSON-TYPE-format SLOT-OPTS,
 applying default slot-options, etc."
   (json-type-normalize-slot-options
-   (merge-plists (json-type-implicit-slot-options class-name slot-name)
+   (merge-plists (json-type-implicit-slot-options slot-name)
                  slot-opts)))
 
-(defun json-type-implicit-slot-options (class-name slot-name)
+(defun json-type-implicit-slot-options (slot-name)
   "Return default property-list slot options for a json-type CLOS class."
-  (list :accessor (intern (format nil "~A-~A" class-name slot-name))))
+  (list :accessor (intern (format nil "~A" slot-name))))
 
 (defun json-type-normalize-slot-options (slot-opts)
   "Take property-list slot options from a DEFINE-JSON-TYPE format and massage it

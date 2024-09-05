@@ -18,40 +18,29 @@
 (defpackage #:activity-servist/vocab/activity
   (:use #:cl)
   (:nicknames "AS/V/A" "ACTIVITY-VOCABULARY" "ACTIVITY")
-  (:shadow #:block #:delete #:ignore #:listen #:read #:remove)
+  (:shadow #:block #:delete #:first #:ignore #:last #:listen #:read #:remove)
   ;; One should never USE this package, since some class-names shadow
   ;; core Common Lisp symbols! Beware! :P
   (:export
    ;; Classes
-   :accept :activity :add :announce :application :arrive :article :audio :block
-   :collection :collection-page :create :delete :dislike :document :event :flag
-   :follow :group :ignore :ignore :image :intransitive-activity :invite :join
-   :leave :like :link :listen :move :note :object :offer :ordered-collection
-   :ordered-collection-page :organization :page :person :place :profile
-   :question :read :reject :relationship :remove :service :tentative-accept
-   :tentative-reject :tombstone :travel :undo :update :video :view
-   ;; Accessors
-   :activity-actor :activity-instrument :activity-object :activity-origin
-   :activity-result :activity-target
-   :collection-current :collection-first :collection-items :collection-last
-   :collection-total-items
-   :collection-page-next :collection-page-part-of :collection-page-prev
-   :link-height :link-href :link-hreflang :link-media-type :link-name
-   :link-preview :link-rel :link-summary :link-width
-   :object-actor :object-attachment :object-attributed-to :object-audience
-   :object-content :object-context :object-name :object-end-time
-   :object-generator :object-icon :object-image :object-in-reply-to
-   :object-location :object-preview :object-published :object-replies
-   :object-start-time :object-summary :object-tag :object-updated
-   :object-url :object-to :object-bto :object-cc :object-bcc
-   :object-media-type :object-duration
-   :ordered-collection-page-start-index ordered-collection-ordered-items
-   :place-accuracy :place-altitude :place-latitude :place-longitude
-   :place-radius :place-units
-   :question-all-of :question-closed :question-one-of
-   :profile-describes
-   :relationship-object :relationship-relationship :relationship-subject
-   :tombstone-former-type :tombstone-deleted))
+   :accept :activity :actor :add :announce :application :arrive :article :audio
+   :block :collection :collection-page :create :delete :dislike :document
+   :event :flag :follow :group :ignore :image :intransitive-activity :invite
+   :join :leave :like :link :listen :mention :move :note :object :offer
+   :ordered-collection :ordered-collection-page :organization :page :person
+   :place :profile :question :read :reject :relationship :remove :service
+   :tentative-accept :tentative-reject :tombstone :travel :undo :update :video
+   :view
+   ;; Slots/Accessors
+   :accuracy :actor :altitude :any-of :arrive :attachment :attributed-to
+   :audience :bcc :bto :cc :closed :content :context :current :deleted
+   :describes :duration :endpoints :end-time :first :followers :following
+   :former-type :generator :height :href :hreflang :icon :image :inbox
+   :in-reply-to :instrument :items :last :latitude :liked :location :longitude
+   :media-type :name :next :object :one-of :ordered-items :origin :outbox
+   :part-of :preferred-username :prev :preview :published :radius :rel
+   :relationship :replies :result :start-index :start-time :streams :subject
+   :summary :tag :target :to :total-items :units :updated :url :width))
 
 (in-package #:activity-servist/vocab/activity)
 
@@ -66,9 +55,9 @@ Items of DIRECT-CHILDREN should be of the form,
   (append
    '(progn)
    (mapcar (lambda (subclass-list)
-             (let ((class-name    (first  subclass-list))
-                   (type-name     (second subclass-list))
-                   (documentation (third  subclass-list)))
+             (let ((class-name    (cl:first subclass-list))
+                   (type-name     (second   subclass-list))
+                   (documentation (third    subclass-list)))
                `(json-ld:define-json-type (,class-name ,type-name) ,superclasses ,context
                   ()
                   (:documentation ,documentation))))
@@ -171,37 +160,29 @@ The notion of “context” used is intentionally vague. The intended function i
    ;; Required actor slots
    (inbox
     "inbox"
-    :accessor actor-inbox
     :documentation "A reference to an OrderedCollection comprised of all the messages received by the actor.")
    (outbox
     "outbox"
-    :accessor actor-outbox
     :documentation "An OrderedCollection comprised of all the messages produced by the actor.")
    (following
     "following"
-    :accessor actor-following
     :documentation "A link to a collection of the actors that this actor is following.")
    (followers
     "followers"
-    :accessor actor-followers
     :documentation "A link to a collection of the actors that follow this actor.")
 
    ;; Optional Actor slots
    (liked
     "liked"
-    :accessor actor-liked
     :documentation "A link to a collection of objects this actor has liked.")
    (streams
     "streams"
-    :accessor actor-streams
     :documentation "A list of supplementary Collections which may be of interest.")
    (preferred-username
     "preferredUsername"
-    :accessor actor-preferred-username
     :documentation "A short username which may be used to refer to the actor, with no uniqueness guarantees.")
    (endpoints
     "endpoints"
-    :accessor actor-endpoints
     :documentation "A JSON object which maps additional (typically server/domain-wide) endpoints which may be useful either for this actor or someone referencing this actor. This mapping may be nested inside the actor document as the value or may be a link to a JSON-LD document with these properties.
 May include the properties “proxyUrl”, “oauthAuthorizationEndpoint”, “oauthTokenEndpoint”, “provideClientKey”, “signClientKey”, and “sharedInbox”.
 See the spec for details on these properties: https://www.w3.org/TR/activitypub/#proxyUrl"))
