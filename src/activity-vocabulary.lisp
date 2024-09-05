@@ -46,7 +46,7 @@
 
 (defmacro define-json-empty-types (superclasses context &rest direct-children)
   "For each list of DIRECT-CHILDREN, a “hollow” JSON subtype and CLOS subclass
-ofE SUPERCLASSES will be created, with the given JSON-LD context CONTEXT.
+ofE SUPERCLASSES will be created, with the given JSON-LD context @CONTEXT.
 These new subclasses have no slots of its own — they will be empty derivatives
 of SUPERCLASSES.
 

@@ -35,7 +35,7 @@
 ;;; ————————————————————————————————————————
 (defvar *litepub-uri* "https://jam.xwx.moe/schemas/litepub-0.1.jsonld"
   "The “Litepub” flavour we use is nicked directly from Pleroma; there is not a
-canonical URL for it. This URI will be used in encoded LITEPUB-OBJECTs in the
+canonical URL for it. This URI will be used in encoded LITEPUB:OBJECTs in the
 @CONTEXT.
 Defaults to a copy at jam.xwx.moe — because why not? ¯\_(ツ)_/¯")
 
@@ -43,11 +43,11 @@ Defaults to a copy at jam.xwx.moe — because why not? ¯\_(ツ)_/¯")
 
 ;;; Core types
 ;;; ————————————————————————————————————————
-(defclass litepub-object ()
+(defclass object ()
   ()
   (:documentation "The base class used for Litepub objects."))
 
-(json-ld:define-json-type (as/v/a:object "Object") (as/jld::json-ld-object litepub-object) *litepub-uri*
+(json-ld:define-json-type (as/v/a:object "Object") (as/jld:object litepub:object) *litepub-uri*
   ((atom-uri
     "atomUri"
     :documentation "A string containing a URI to an Atom-feed alternative representation of an object.
@@ -109,7 +109,7 @@ Potentially deprecated/very uncommon.")
 
 ;; https://schema.org/PropertyValue
 (json-ld:define-json-type (property-value "PropertyValue")
-    (litepub-object json-ld:json-ld-object) *litepub-uri*
+    (litepub:object json-ld:object) *litepub-uri*
   (;; https://schema.org/value
    (value
     "value"
@@ -196,6 +196,6 @@ In case of doubt, QUOTE-URL is preferred."))
 ;;; Extended Link types
 ;;; ————————————————————————————————————————
 ;; https://docs.joinmastodon.org/spec/activitypub/#Hashtag
-(json-ld:define-json-type (hashtag "Hashtag") (as/v/a:link litepub-object) *litepub-uri*
+(json-ld:define-json-type (hashtag "Hashtag") (as/v/a:link litepub:object) *litepub-uri*
   ()
   (:documentation "Similar to Mentions, a Hashtag is used to link a post to given topics. Should be stored in a TAG slot, and contain NAME (#hashtag) and HREF (link to a server’s hashtag listing)."))

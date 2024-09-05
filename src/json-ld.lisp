@@ -25,8 +25,8 @@
    #:no-@context
    ;; Globals
    #:*default-json-type*
-   ;; Objects
-   #:json-ld-object
+   ;; Classes
+   #:object
    ;; Slots/Accessors
    :@context :@id :@type :@etc))
 
@@ -40,7 +40,7 @@
 of this type. Should be a string, the IRI corresponding to a registered type.
 For example: “https://www.w3.org/ns/activitystreams#Object”
 
-The default value “*” refers to the base JSON-LD-OBJECT type.")
+The default value “*” refers to the base JSON-LD:OBJECT type.")
 
 (defvar *json-types*    (make-hash-table :test #'equal)
   "Stores descriptions of each JSON-type, mapping type-IRI to class-name and property-name to slot-name.
@@ -60,7 +60,7 @@ Maps URLs to text-content, so we don’t have to download the same context again
 
 ;;; Base class
 ;;; ————————————————————————————————————————
-(defclass json-ld-object ()
+(defclass object ()
   ((@context
     :initform nil
     :documentation
@@ -85,7 +85,7 @@ slot. This is often filled up in the case of undefined node-types or non-adheren
 object definitions.")))
 
 (setf (gethash "*" *json-types*)
-      '((json-ld-object)
+      '((object)
         ("@context" @context . "@context")
         ("@id" @id . "@id")
         ("@type" @type . "@type")))
@@ -94,18 +94,18 @@ object definitions.")))
   (:documentation
    "Returns a JSON-LD CLOS object’s @context, for use in JSON-encoding of the
 object.
-The implementation for the JSON-LD-OBJECT class simply returns the activitystreams
+The implementation for the JSON-LD:OBJECT class simply returns the activitystreams
 URL.
 If you would like to change @context on a class-level, override this method.
 If you would like to change it on an object-level, set the @CONTEXT slot."))
 
-(defmethod @context ((obj json-ld-object))
+(defmethod @context ((obj object))
   (let ((slot-@context (slot-value obj '@context)))
     (unless (eq slot-@context 'no-@context)
       (or slot-@context
           "https://www.w3.org/ns/activitystreams"))))
 
-(defmethod yason:encode-slots progn ((obj json-ld-object))
+(defmethod yason:encode-slots progn ((obj object))
   (flatten-contained-contexts obj)
   ;; We only want to encode @context, @id, and @type if the child class doesn’t
   ;; have its own alias for them.
@@ -131,7 +131,7 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
                                          (cdr alist-cell)))
           (@etc obj)))
 
-(defmethod yason:encode ((obj json-ld-object) &optional (stream *standard-output))
+(defmethod yason:encode ((obj object) &optional (stream *standard-output))
   (yason:with-output (stream)
     (yason:encode-object obj)))
 
@@ -150,9 +150,9 @@ encoding as @type’s value. If only the CLOS class-name is provided, @type will
 not be encoded for this object.
 
 DIRECT-SUPERCLASSES is a list of JSON-LD CLOS classes, whose slots and context
-this should inherit. JSON-LD-OBJECT should be somewhere in the hierarchy, in order
+this should inherit. JSON-LD:OBJECT should be somewhere in the hierarchy, in order
 to provide “@context”, “@id”, and “@type”; if no superclasses are provided,
-JSON-LD-OBJECT is default.
+JSON-LD:OBJECT is default.
 
 CONTEXT is a context hash-table, parsed from a JSON-LD context by JSON-LD:PARSE
 or JSON-LD:PARSE-CONTEXT. Any terms defined in this context will be used to
@@ -202,11 +202,11 @@ Here is a brief example partially defining the “Place” type from ActivityStr
     ;; Now, actually define the class, encoder, etc…
     `(let ((json-class
              (define-json-clos-class ,names
-                 ,(or direct-superclasses `(json-ld-object))
+                 ,(or direct-superclasses `(json-ld:object))
                ,direct-slots
                ,options)))
        (define-json-type-encoder ,(car names) ,direct-slots)
-       (register-json-type ',names (or ',direct-superclasses '(json-ld-object)) ',direct-slots ,context)
+       (register-json-type ',names (or ',direct-superclasses '(json-ld:object)) ',direct-slots ,context)
        json-class)))
 
 (defmacro define-json-clos-class (names direct-superclasses direct-slots options)
@@ -511,7 +511,7 @@ during JSON-encoding with YASON:ENCODE."
              (setf (slot-value subobj '@context) 'no-@context))))
 
 (defun json-slot-values (obj)
-  "Return the values of all registered slots/properties of a JSON-LD-OBJECT.
+  "Return the values of all registered slots/properties of a JSON-LD:OBJECT.
 Unregistered slots that don’t get encoded/decoded are ignored."
   (let* ((type-def  (class-json-type-definition (class-name (class-of obj))))
          (slot-defs (cdr type-def)))
@@ -529,28 +529,28 @@ Unregistered slots that don’t get encoded/decoded are ignored."
               (slot-value obj '@etc))))))
 
 (defun contained-json-objects (item)
-  "Given ITEM of arbitrary type, return all JSON-LD-OBJECTs contained within,
-recursively. Lists, hash-tables, and the slots of JSON-LD-OBJECTs are explored."
+  "Given ITEM of arbitrary type, return all JSON-LD:OBJECTs contained within,
+recursively. Lists, hash-tables, and the slots of JSON-LD:OBJECTs are explored."
   (typecase item
-    (cons           (reduce
-                     (lambda (a b)
-                       (append a b))
-                     (mapcar (lambda (a) (contained-json-objects a))
-                             item)))
-    (hash-table     (let ((ret '()))
-                      (maphash
-                       (lambda (k v)
-                         (setq ret
-                               (append ret (contained-json-objects v))))
-                       item)
-                      ret))
-    (json-ld-object (append
-                     (list item)
-                     (reduce
-                      (lambda (b c)
-                       (append b c))
-                      (mapcar (lambda (a) (contained-json-objects a))
-                              (json-slot-values item)))))))
+    (cons       (reduce
+                 (lambda (a b)
+                   (append a b))
+                 (mapcar (lambda (a) (contained-json-objects a))
+                         item)))
+    (hash-table (let ((ret '()))
+                  (maphash
+                   (lambda (k v)
+                     (setq ret
+                           (append ret (contained-json-objects v))))
+                   item)
+                  ret))
+    (object     (append
+                 (list item)
+                 (reduce
+                  (lambda (b c)
+                   (append b c))
+                  (mapcar (lambda (a) (contained-json-objects a))
+                          (json-slot-values item)))))))
 
 
 
