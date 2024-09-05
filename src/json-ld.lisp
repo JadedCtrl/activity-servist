@@ -27,10 +27,8 @@
    #:*default-json-type*
    ;; Objects
    #:json-ld-object
-   ;; Accessors
-   #:json-ld-context #:json-ld-etc #:json-ld-id #:json-ld-type
-   ;; Slots
-   :@context :@id :@type :.etc))
+   ;; Slots/Accessors
+   :@context :@id :@type :@etc))
 
 (in-package #:activity-servist/json-ld)
 
@@ -67,20 +65,20 @@ Maps URLs to text-content, so we don’t have to download the same context again
     :initform nil
     :documentation
     "Used as an override for a class’es @context during encoding.
-The method JSON-LD-CONTEXT is how the contents of encoded @context is
+The method @CONTEXT is how the contents of encoded @context is
 determined; to change a class’es default/calculated @context, override that
 method. This slot is for changing a specific object’s @context.")
    (@id
-    :accessor json-ld-id
+    :accessor @id
     :documentation
     "Provides the globally unique identifier for an object.")
    (@type
-    :accessor json-ld-type
+    :accessor @type
     :documentation
     "Identifies the type of an object. Used to determine the corresponding CLOS-object.")
-   (.etc
+   (@etc
     :initform nil
-    :accessor json-ld-etc
+    :accessor @etc
     :documentation
     "Components of the JSON object which, during parsing, did not match any specific
 slot. This is often filled up in the case of undefined node-types or non-adherent
@@ -92,7 +90,7 @@ object definitions.")))
         ("@id" @id . "@id")
         ("@type" @type . "@type")))
 
-(defgeneric json-ld-context (obj)
+(defgeneric @context (obj)
   (:documentation
    "Returns a JSON-LD CLOS object’s @context, for use in JSON-encoding of the
 object.
@@ -101,7 +99,7 @@ URL.
 If you would like to change @context on a class-level, override this method.
 If you would like to change it on an object-level, set the @CONTEXT slot."))
 
-(defmethod json-ld-context ((obj json-ld-object))
+(defmethod @context ((obj json-ld-object))
   (let ((slot-@context (slot-value obj '@context)))
     (unless (eq slot-@context 'no-@context)
       (or slot-@context
@@ -119,9 +117,9 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
            (no-context-p (aliased-prop-p "@context" type-def))
            (no-id-p      (aliased-prop-p "@id" type-def))
            (no-type-p    (aliased-prop-p "@type" type-def))
-           (context      (json-ld-context obj))
-           (id           (and (slot-boundp obj '@id)   (json-ld-id obj)))
-           (type         (and (slot-boundp obj '@type) (json-ld-type obj))))
+           (context      (@context obj))
+           (id           (and (slot-boundp obj '@id)   (@id obj)))
+           (type         (and (slot-boundp obj '@type) (@type obj))))
       (when (and context (not no-context-p))
         (yason:encode-object-element "@context" context))
       (when (and id (not no-id-p))
@@ -131,7 +129,7 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
   (mapcar (lambda (alist-cell)
             (yason:encode-object-element (car alist-cell)
                                          (cdr alist-cell)))
-          (json-ld-etc obj)))
+          (@etc obj)))
 
 (defmethod yason:encode ((obj json-ld-object) &optional (stream *standard-output))
   (yason:with-output (stream)
@@ -375,10 +373,10 @@ CTX is the according parsed-context."
      (lambda (property value)
        (let* ((property-def  (assoc property type-def :test #'equal))
               (slot-name     (second property-def))
-              (etc-value     (slot-value obj '.etc)))
+              (etc-value     (slot-value obj '@etc)))
          (if property-def
              (setf (slot-value obj slot-name) value)
-             (setf (slot-value obj '.etc)
+             (setf (slot-value obj '@etc)
                    (append etc-value
                            (list (cons property value)))))))
      table)
@@ -501,8 +499,8 @@ during JSON-encoding with YASON:ENCODE."
   (loop for subobj in (cdr (contained-json-objects obj))
         do
            (progn
-             (let ((old-context    (json-ld-context obj))
-                   (old-subcontext (json-ld-context subobj)))
+             (let ((old-context    (@context obj))
+                   (old-subcontext (@context subobj)))
                (when (and old-subcontext
                           (not (equal old-context old-subcontext)))
                  (setf (slot-value obj '@context)
@@ -528,7 +526,7 @@ Unregistered slots that don’t get encoded/decoded are ignored."
               slot-defs)
       (mapcar (lambda (etc-cons)
                 (cdr etc-cons))
-              (slot-value obj '.etc))))))
+              (slot-value obj '@etc))))))
 
 (defun contained-json-objects (item)
   "Given ITEM of arbitrary type, return all JSON-LD-OBJECTs contained within,
