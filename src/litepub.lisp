@@ -17,7 +17,16 @@
 
 (defpackage #:activity-servist/vocab/litepub
   (:use #:cl)
-  (:nicknames "AS/V/LP" "LITEPUB"))
+  (:nicknames "AS/V/LP" "LITEPUB")
+  (:export
+   ;; Classes
+   :object
+   :chat-message :emoji :emoji-react :hashtag :property-value
+   ;; Slots/Accessors
+   :also-known-as :atom-uri :capabilities :conversation :direct-message-p
+   :discoverablep :former-representations :invisiblep :list-message
+   :manually-approves-followers-p :non-anonymous :public-key :quote-uri
+   :quote-url :sensitivep :value))
 
 (in-package #:activity-servist/vocab/litepub)
 
