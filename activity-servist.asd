@@ -9,7 +9,7 @@
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
   :in-order-to ((test-op (test-op "activitypub/tests")))
-  :depends-on (:activity-servist/signatures
+  :depends-on (:activity-servist/vocab/activity :activity-servist/signatures
                :alexandria :clack :dexador
                :local-time  :purl :str :webtentacle :yason)
   :components ((:file "src/activity-servist")))

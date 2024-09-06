@@ -17,11 +17,31 @@
 
 (defpackage #:activity-servist
   (:use #:cl #:activity-servist/signatures)
-  (:nicknames "AS")
-  (:export :server :start-server))
+  (:nicknames "AS" "ACTIVITYPUB")
+  (:export
+   ;; Functions
+   :server :start-server
+   ;; Globals
+   *config*))
 
 (in-package #:activity-servist)
 
+
+;;; Globals
+;;; ————————————————————————————————————————
+(defvar *config* '(:address "localhost" :port 8080 :protocol "https")
+  "Configuration for the server, a property-list.
+There are three optional properties:
+• :PROTOCOL, either “https” or “http” (the latter for testing, only!).
+• :ADDRESS, the server’s domain-name/address.
+• :PORT, the server’s port.
+
+There is one required property:
+• :FETCH, a function used as a callback by activity-servist.
+
+:FETCH should be a function of (FETCH URI)
+This function should simply return an object from your storage, queried by a URI.
+The URI parameter is going to be either an @ID or an account-URI of the form “acct:username@hostname”.")
 
 (defun users ()
   "List of the server's usernames."
@@ -38,9 +58,24 @@
     (".well-known/webfinger" . http-webfinger)
     (".well-known/host-meta" . http-host-meta)))
 
+(defvar *privkey*
+  (alexandria:read-file-into-string
+   (asdf:system-relative-pathname :activity-servist #p"enc/privkey.pem")))
+(defvar *pubkey*
+  (alexandria:read-file-into-string
+   (asdf:system-relative-pathname :activity-servist #p"enc/pubkey.pem")))
 
-(defvar *privkey* (alexandria:read-file-into-string #p"../enc/privkey.pem"))
-(defvar *pubkey* (alexandria:read-file-into-string #p"../enc/pubkey.pem"))
+
+
+;;; Callbacks
+;;; ————————————————————————————————————————
+(defun fetch (uri)
+  "Runs the user-defined callback FETCH, as stored in *CONFIG*.
+Returns the ActivityPub object associated with the given URI."
+  (let ((func (getf *config* :fetch)))
+    (if func
+        (funcall func uri)
+        (error "No FETCH function found in ACTIVITY-SERVIST:*CONFIG*."))))
 
 
 
@@ -50,71 +85,50 @@
   `(200 (:content-type "application/xrd+xml; charset=utf-8")
     (,(str:concat "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <XRD xmlns=\"http://docs.oasis-open.org/ns/xri/xrd-1.0\">
-<link rel=\"lrdd\" type=\"application/xrd+xml\" template=\"https://"
-                  (getf env :domain)
+<link rel=\"lrdd\" type=\"application/xrd+xml\" template=\""
+                  (getf *config* :protocol)
+                  "://"
+                  (getf *config* :address)
                   "/.well-known/webfinger?resource={uri}\"/>
 </XRD>
 "))))
+
+
 
 
 
 ;;; Webfinger response
 ;;; ————————————————————————————————————————
 (defun http-webfinger (env path-items params)
-  (webtentacle:server env (lambda (resource) (resource-info-func resource)) nil))
+  (webtentacle:server env (lambda (resource) (webfinger-resource-info resource))))
 
-(defun resource-userhost (resource)
-  "Given an account URI in webfinger-friendly format, return the corresponding)))
-username and host in a list. Whether or not these are valid… that’s your
-business!
-Ex:  acct:mom@bird.com → '(“mom” “bird.com”)"
-  (cond
-    ;; A @bird@mom-style resource
-    ((str:containsp "@" resource)
-     (let* ((sans-acct (if (str:starts-with-p "acct:" resource)
-                           (subseq resource 5)
-                           resource))
-            (sans-@ (if (str:starts-with-p "@" sans-acct)
-                        (subseq sans-acct 1)
-                        sans-acct)))
-       (destructuring-bind (user host)
-           (str:split "@" sans-@)
-         (cons user host))))
-    ;; A URL-style resource
-    ((str:containsp "/u/" resource)
-     (cons
-      (pathname-name resource)
-      (purl:url-host resource)))))
+(defun webfinger-resource-info (resource)
+  "Given a Webfinger RESOURCE, return a property-list of data on the given resource.
+Will "
+  (let ((obj (fetch resource)))
+    (and obj (webfinger-info resource obj))))
 
-(defun resource-valid-p (resource)
-  "Given a webfinger-style “resource”"
-  (let* ((userhost (resource-userhost resource))
-         (userhost-str (funcall #'str:concat (car userhost) "@" (cdr userhost))))
-   (member userhost-str (userhosts)
-           :test (lambda (a b)
-                   (string-equal (string-downcase a)
-                                 (string-downcase b))))))
+(defgeneric webfinger-info (resource obj)
+  (:documentation "Returns a property-list of Webfinger data on the given object.
+Override this to provide custom Webfinger data; do what you please, but make sure RESOURCE is set as the :SUBJECT value.
 
-(defun resource-info-func (resource)
-  "Given a webfinger RESOURCE, return a property-list of data on the given user…
-if they exist, that is.
-This is used by the WEBTENTACLE webfinger server; you can see information on
-the plist in the docstring for its WEBTENTACLE:SERVER function."
-  (let* ((userhost (resource-userhost resource))
-         (profile (str:concat "https://" (cdr userhost) "/u/" (car userhost))))
-    (when (resource-valid-p resource)
-      (list
-       :subject (str:concat "acct:" (car userhost) "@" (cdr userhost))
-       :aliases `(,profile)
-       :links
-       `((href ,profile
-               rel  "self"
-               type "application/activity+json")
-         (href ,profile
-               rel "self"
-               type "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"")
-         (template ,(str:concat "https://" (cdr userhost) "/ostatus_subscribe?acct={uri}")
-                   rel "http://ostatus.org/schema/1.0/subscribe"))))))
+For information on the property-list’s format, see the dosctring of WEBTENTACLE:SERVER."))
+
+;; A default implementation, which provides (likely) all of the information
+;; necessary for most use-cases.
+(defmethod webfinger-info (resource (obj json-ld:object))
+  (let ((obj-uri (json-ld:@id obj)))
+    (list
+     :subject resource
+     :aliases (list obj-uri)
+     :links
+     ;; Note: Doesn’t provide the os_status subscribe link.
+     `((href ,obj-uri
+             rel "self"
+             type "application/activity+json")
+       (href ,obj-uri
+             rel "self"
+             type "application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"")))))
 
 
 
@@ -130,8 +144,10 @@ the plist in the docstring for its WEBTENTACLE:SERVER function."
 
 (defun user-actor (config username)
   "The JSON of a user's actor."
-  (let* ((user-root (str:concat "https://" (getf config :domain) "/u/" username))
-         (yason:*symbol-encoder* 'yason:encode-symbol-as-lowercase))
+  (let* ((user-root
+           (str:concat (getf *config* :protocol) "://" (getf *config* :address) "/u/" username))
+         (yason:*symbol-encoder*
+           'yason:encode-symbol-as-lowercase))
     (yason:with-output-to-string* ()
       (yason:encode-alist
        `(("@context" . ("https://www.w3.org/ns/activitystreams"
@@ -244,10 +260,10 @@ Mi ne estas knabino!!")
 ;;; Invocation
 ;;; ————————————————————————————————————————
 (defun server (env)
-  "Returns the response data for Clack, given the request data `env`."
-  (setq *logs* (append *logs* (list env (babel:octets-to-string (alexandria:read-stream-content-into-byte-vector (getf env :raw-body))))))
-  (let* ((path (pathname-sans-parameters (getf env :request-uri)))
-         (params (pathname-parameters (getf env :request-uri)))
+  "Returns the response data for Clack, given the request property-list ENV."
+  (nconc *logs* (list env (babel:octets-to-string (alexandria:read-stream-content-into-byte-vector (getf env :raw-body)))))
+  (let* ((path   (pathname-sans-parameters (getf env :request-uri)))
+         (params (pathname-parameters      (getf env :request-uri)))
          (response-function
            (or (assoc-by-path (directories) (pathname-components path))
                '("" . http-404)))
@@ -259,13 +275,13 @@ Mi ne estas knabino!!")
     (or (funcall (cdr response-function) env path-sans-response-root params)
         (funcall 'http-404 env path-sans-response-root params))))
 
-(defun start-server (&optional (config '(:domain "localhost" :port 8080)))
+(defun start-server ()
   "Start the server."
   (clack:clackup (lambda (env)
-                   (server (append env config)))
+                   (server env))
                  :server 'woo
                  :address "0.0.0.0"
-                 :port (getf config :port)))
+                 :port (getf *config* :port)))
 
 
 
