@@ -56,6 +56,9 @@ Used for the :UPDATE feature of DEFINE-JSON-TYPE, so you can add a slot to a pre
   "Caches context-texts fetched over HTTP.
 Maps URLs to text-content, so we don’t have to download the same context again and again.")
 
+(defvar *http-cache-dirs* (list (asdf:system-relative-pathname :activity-servist/json-ld "schema"))
+  "A list of directories used for caching remote JSON-LD caches. The cache is read-only.")
+
 
 
 ;;; Base class
@@ -640,14 +643,38 @@ defined in the context."))
   "Makes a GET request to URI, returning the resultant string.
 Each resultant string is cached in the *HTTP-CACHE* global variable; if the same
 URI is requested more than once, the cached version will subsequently be
-returned."
-  (or (gethash uri *http-cache*)
-      (setf (gethash uri *http-cache*)
+returned.
+In addition, there is a filesystem cache; if a file named afer the URI
+(sans the protocol, replacing slashes '/' with hyphens '-') is found in
+the directories *HTTP-CACHE-DIRS*, its contents will be returned instead."
+  (or (gethash uri *http-cache*)       ; Try our downloaded/read-file cache.
+      (setf (gethash uri *http-cache*) ; Try our read-only filesystem cache...
+            (let* ((file-leaf       (str:replace-all "/" "-" (uri-sans-scheme uri)))
+                   (cached-filepath (find-file file-leaf *http-cache-dirs*)))
+              (when cached-filepath
+                (alexandria:read-file-into-string cached-filepath))))
+      (setf (gethash uri *http-cache*) ; If not cached, download & cache it.
             (http-get uri :headers headers))))
+
+(defun find-file (file-leaf dirs)
+  "Search for a file of the given name FILE-LEAF within directories DIRS.
+Returns the first found matching file."
+  (or (find file-leaf (uiop:directory-files (format nil "~A/*" (car dirs)))
+            :test (lambda (a b)
+                    (equal a (file-namestring b))))
+      (unless (not (cdr dirs))
+        (get-file-from-dirs file-leaf (cdr dirs)))))
 
 (defun http-get (uri &key headers)
   "Makes a GET request to URI, returning the resultant string."
   (dexador:get uri :headers headers :force-string 't))
+
+(defun uri-sans-scheme (uri)
+  "Returns a URI string without its scheme."
+  (str:replace-all
+   (format nil "~A://" (quri:uri-scheme (quri:uri "https://dad.com/")))
+   ""
+   uri))
 
 (defun remove-from-alist (item alist)
   "Removes the cell corresponding to ITEM from an association list."
