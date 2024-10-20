@@ -48,10 +48,6 @@ Used during encoding an object to JSON, for finding type/property-names from cla
 Keys are the type-IRI (e.g., (“https://www.w3.org/ns/activitystreams#Accept”), and values are an irregular association list, of the form:
   ((CLASS-NAME-SYMBOL . TYPE-NAME) (PROPERTY-IRI SLOT-NAME-SYMBOL . PROPERTY-NAME) ⋯)")
 
-(defvar *class-defs*    (make-hash-table)
-  "Stores the slot definitions of classes, stored directly from DEFINE-JSON-TYPE.
-Used for the :UPDATE feature of DEFINE-JSON-TYPE, so you can add a slot to a pre-existing class without having to redefine the old slots.")
-
 (defvar *http-cache*    (make-hash-table :test #'equal)
   "Caches context-texts fetched over HTTP.
 Maps URLs to text-content, so we don’t have to download the same context again and again.")
@@ -176,14 +172,7 @@ By default, a slot will have an accessor simply named after the slot.
 Set :ACCESSOR to NIL to define no accessor at all.
 
 OPTIONS contains ordinary class options, in the format of DEFCLASS (for example,
-:DOCUMENTATION), with one exception: The :UPDATE option.
-
-If the :UPDATE class option is non-nil, then DIRECT-SLOTS will be considered an
-“update” to the class, and will be appended to any direct-slots defined during
-previous definitions of that class done with DEFINE-JSON-TYPE.
-This is for convenience, so that one doesn’t have to copy an entire class
-defintion over in order to add one or two slots (which is a common occurance
-in the ActivityPub landscape).
+:DOCUMENTATION).
 
 Here is a brief example partially defining the “Place” type from ActivityStreams:
 
@@ -194,23 +183,14 @@ Here is a brief example partially defining the “Place” type from ActivityStr
                 :documentation “The latitude of a place.”)
      (longitude “longitude”
                 :documentation “The longitude of a place.”)))"
-  ;; If the definition is an :UPDATE, remove that from OPTIONS and merge the old
-  ;; slots with the new.
-  (let ((direct-slots
-          (if (assoc :update options)
-              (progn (setf options (remove-from-alist :update options))
-                     (merge-alists direct-slots
-                                   (gethash (car names) *class-defs*) 't))
-              direct-slots)))
-    ;; Now, actually define the class, encoder, etc…
-    `(let ((json-class
-             (define-json-clos-class ,names
-                 ,(or direct-superclasses `(json-ld:object))
-               ,direct-slots
-               ,options)))
-       (define-json-type-encoder ,(car names) ,direct-slots)
-       (register-json-type ',names (or ',direct-superclasses '(json-ld:object)) ',direct-slots ,context)
-       json-class)))
+  `(let ((json-class
+           (define-json-clos-class ,names
+               ,(or direct-superclasses `(json-ld:object))
+             ,direct-slots
+             ,options)))
+     (define-json-type-encoder ,(car names) ,direct-slots)
+     (register-json-type ',names (or ',direct-superclasses '(json-ld:object)) ',direct-slots ,context)
+     json-class))
 
 (defmacro define-json-clos-class (names direct-superclasses direct-slots options)
   "Helper-macro for DEFINE-JSON-TYPE.
@@ -275,10 +255,7 @@ corresponding CLOS class) of a node."
   (let* ((ctx       (parse-context context))
          (type-iri  (getf (gethash (cadr names) ctx) :id))
          (type-name (or type-iri (cadr names))))
-    ;; Save the type’s direct-slots, in case of future :UPDATEs.
-    (setf (gethash (car names) *class-defs*)
-          direct-slots)
-    ;; Now actually save the JSON-type.
+    ;; Save the JSON-type.
     (setf (gethash type-name *json-types*)
           (json-type-registry-list names direct-superclasses ctx direct-slots))))
 
@@ -675,23 +652,6 @@ Returns the first found matching file."
    (format nil "~A://" (quri:uri-scheme (quri:uri "https://dad.com/")))
    ""
    uri))
-
-(defun remove-from-alist (item alist)
-  "Removes the cell corresponding to ITEM from an association list."
-  (remove item alist
-          :test (lambda (key cell)
-                  (eq (car cell) key))))
-
-(defun merge-alists (a b &optional clobberp)
-  "Merge two association lists, adding all items of A to B not pre-existing in B.
-If CLOBBERP is set, pre-existing items of B will be overwritten regardless."
-  (loop for cell in a
-        do (let ((b-has-item-p (assoc (car cell) b)))
-             (cond ((and b-has-item-p clobberp)
-                    (setf (cdr (assoc (car cell) b)) (cdr cell)))
-                   ((not b-has-item-p)
-                    (alexandria:appendf b (list cell))))))
-  b)
 
 (defun plist-keys (plist)
   "Return a list of keys in a property list."
