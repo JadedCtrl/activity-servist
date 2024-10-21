@@ -43,20 +43,11 @@ There is one required property:
 This function should simply return an object from your storage, queried by a URI.
 The URI parameter is going to be either an @ID or an account-URI of the form “acct:username@hostname”.")
 
-(defun users ()
-  "List of the server's usernames."
-  '("servistchjo"))
-
-(defun userhosts ()
-  "List of the server's usernames + hostname."
-  (mapcar (lambda (username) (str:concat username "@" "etc.xwx.moe"))
-          (users)))
-
 (defun directories ()
   "Alist of the server's paths and their response functions."
-  '(("u/" . http-user-dir)
-    (".well-known/webfinger" . http-webfinger)
-    (".well-known/host-meta" . http-host-meta)))
+  '((".well-known/webfinger" . http-webfinger)
+    (".well-known/host-meta" . http-host-meta)
+    (""                      . http-object)))  ; By default, assume object.
 
 (defvar *privkey*
   (alexandria:read-file-into-string
@@ -132,55 +123,19 @@ For information on the property-list’s format, see the dosctring of WEBTENTACL
 
 
 
-;;; User info response(s)
+;;; Object requests
 ;;; ————————————————————————————————————————
-(defun http-user-dir (env path-items params)
-  "Respond to requests within the /u/* directory."
-  (let ((user (car path-items)))
-    ;; In case of request for the user's actor.
-    (if (member user (users) :test 'equal)
-        `(200 (:content-type "application/activity+json")
-              (,(user-actor env user))))))
-
-(defun user-actor (config username)
-  "The JSON of a user's actor."
-  (let* ((user-root
-           (str:concat (getf *config* :protocol) "://" (getf *config* :address) "/u/" username))
-         (yason:*symbol-encoder*
-           'yason:encode-symbol-as-lowercase))
-    (yason:with-output-to-string* ()
-      (yason:encode-alist
-       `(("@context" . ("https://www.w3.org/ns/activitystreams"
-                        "https://w3id.org/security/v1"
-                        "https://litepub.social/litepub/context.jsonld"))
-         ("endpoints" . ,(alexandria:plist-hash-table (list "sharedInbox" "https://etc.xwx.moe/inbox")))
-         ("url" . ,user-root)
-         ("id" . ,user-root)
-         ("type" . "Person")
-         ("preferredUsername" . ,username)
-         ("name" . "Servistiĉo")
-         ("inbox" . ,(str:concat user-root "/inbox"))
-         ("outbox" . ,(str:concat user-root  "/outbox"))
-         ("discoverable" . t)
-         ("summary" . "Mi estas simpla roboto, kiu montras ke iomete ekfunkcias activity-servist.
-… ĉu mi rajtas demeti la servistinan kostumon, nun?
-Mi ne estas knabino!!")
-         ("icon"
-          . ,(alexandria:plist-hash-table
-              (list
-               "type" "Image"
-               "url" "https://xwx.moe/etc/servisticho-profilbildo.jpg")))
-         ("image"
-          . ,(alexandria:plist-hash-table
-              (list
-               "type" "Image"
-               "url" "https://xwx.moe/etc/servisticho-standardo.png")))
-         ("publicKey"
-          . ,(alexandria:plist-hash-table
-              (list
-               "id" (str:concat user-root "#main-key")
-               "owner" user-root
-               "publicKeyPem" *pubkey*))))))))
+(defun http-object (env path-items params)
+  "If an ActivityPub object is requested, serve it (if such an object
+can be found). Uses the callback :FETCH, defined in *CONFIG*."
+  (let* ((uri (reduce (lambda (a b) (format nil "~A/~A" a b))
+                     (append (list (getf *config* :host)) path-items)))
+         (obj (fetch uri)))
+    (if obj
+        (list 200 '(:content-type "application/json")
+              (list (yason:with-output-to-string* () (yason:encode-object obj))))
+        `(400 (:content-type "text/plain")
+          ("Such an object doesn’t exist!")))))
 
 
 
