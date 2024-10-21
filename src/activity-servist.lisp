@@ -29,12 +29,12 @@
 
 ;;; Globals
 ;;; ————————————————————————————————————————
-(defvar *config* '(:address "localhost" :port 8080 :protocol "https")
+(defvar *config* '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080)
   "Configuration for the server, a property-list.
 There are three optional properties:
-• :PROTOCOL, either “https” or “http” (the latter for testing, only!).
-• :ADDRESS, the server’s domain-name/address.
-• :PORT, the server’s port.
+• :HOST, the public-facing URI of the server.
+• :ADDRESS, the address the server is exposed on.
+• :PORT, the port the server is exposed on.
 
 There is one required property:
 • :FETCH, a function used as a callback by activity-servist.
@@ -77,14 +77,10 @@ Returns the ActivityPub object associated with the given URI."
     (,(str:concat "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <XRD xmlns=\"http://docs.oasis-open.org/ns/xri/xrd-1.0\">
 <link rel=\"lrdd\" type=\"application/xrd+xml\" template=\""
-                  (getf *config* :protocol)
-                  "://"
-                  (getf *config* :address)
+                  (getf *config* :host)
                   "/.well-known/webfinger?resource={uri}\"/>
 </XRD>
 "))))
-
-
 
 
 

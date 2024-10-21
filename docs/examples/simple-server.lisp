@@ -26,11 +26,12 @@
 (defvar *store* (make-hash-table :test #'equal)
   "Our “object-store” — stores all ActivityPub objects, mapped by their IRI @ID.")
 
-(defvar *config* '(:address "localhost" :protocol "http" :port 8080 :fetch fetch))
+(defvar *config*
+  '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080 :fetch fetch))
 
-(defvar *user-id-format* "~A://~A/users/~A"
+(defvar *user-id-format* "~A/users/~A"
   "The format we use for user’s @IDs/URIs.
-The first parameter is the protocol, the second the host, and the third the username.
+The first parameter is the protocol+host, and the second is the username.
 For example: “https://localhost:8080/users/lena”.")
 
 
@@ -91,15 +92,16 @@ That is, an “acct:username@host.tld” URI."
     (destructuring-bind (user host)
         (str:split "@" sans-preceding-@)
       (format nil *user-id-format*
-              (host-scheme host) host user))))
+              (host-w-scheme host) user))))
 
-(defun host-scheme (hostname)
-  "Helper-function for ACCT-URI->ID. Returns the expected protocol of a hostname.
-If it’s our configured :ADDRESS (in *CONFIG*), then return *CONFIG*’s :PROTOCOL.
+(defun host-w-scheme (hostname)
+  "Helper-function for ACCT-URI->ID. From a hostname, returns “scheme://hostname”.
+If it matches our configured :HOST (in *CONFIG*), simply returns :HOST’s value.
 Otherwise, assume “https”."
-  (if (equal (getf *config* :address) hostname)
-      (getf *config* :protocol)
-      "https"))
+  (let ((our-host (getf *config* :host)))
+    (if (equal (quri:uri-host (quri:uri our-host)) hostname)
+        our-host
+        (format nil "https://~A" hostname))))
 
 
 
@@ -136,9 +138,7 @@ Otherwise, assume “https”."
 The ID and ENDPOINTS are derived using the parameter USERNAME and the global *USER-ID-FORMAT*."
   (let ((obj (make-instance 'user))
         (uri (format nil *user-id-format*
-                     (getf *config* :protocol)
-                     (getf *config* :address)
-                     username)))
+                     (getf *config* :host) username)))
     (flet ((sub-uri (path)
              (format nil "~A/~A" uri path)))
       (setf (as:name obj)      username)
