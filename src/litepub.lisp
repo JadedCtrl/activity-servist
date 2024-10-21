@@ -39,6 +39,24 @@ canonical URL for it. This URI will be used in encoded LITEPUB:OBJECTs in the
 @CONTEXT.
 Defaults to a copy at jam.xwx.moe — because why not? ¯\_(ツ)_/¯")
 
+(unless +new-classes+
+  (defconstant +new-classes+ '(chat-message emoji emoji-react hashtag property-value)
+    "Simple list of classes/JSON types defined in this package.
+Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context."))
+
+;; This isn’t pretty… but it helps us avoid bringing in another dependency! :^)
+;; (closer-mop, that is.)
+(unless +new-slots+
+  (defconstant +new-slots+
+    '(atom-uri sensitivep non-anonymous direct-message-p former-representations
+      public-key discoverablep manually-approves-followers-p also-known-as
+      capabilities            ; Object ←↑
+      invisiblep list-message ; Activity
+      conversation            ; Update
+      quote-url quote-uri)    ; Note
+    "List of slots added to subclasses corresponding AS/VOCAB/ACTIVITY classes.
+For example, slots in our OBJECT that aren’t in AS/V/A:OBJECT.
+Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context."))
 
 
 ;;; Core types
@@ -87,14 +105,16 @@ One known capabilitity-name is Pleroma’s “acceptsChatMessages”.")))
 
 
 (defmethod json-ld:@context ((obj litepub:object))
-  (let ((class (class-name (class-of obj))))
-    (case class
-      ;; Only use LitePub context for newly-defined classes.
-      (('property-value 'emoji-react 'chat-message 'hashtag 'emoji)
-       *litepub-uri*)
-      ;; TODO: Also use LitePub context for old classes when new slots are used.
-      (otherwise
-       (call-next-method)))))
+  (let ((lp-context (list "https://www.w3.org/ns/activitystreams" *litepub-uri*)))
+    ;; Only use LitePub context for newly-defined classes.
+    (if (member obj +new-classes+ :test #'typep)
+        lp-context
+        ;; … or for derivative classes with new slots.
+        (or (dolist (slot +new-slots+)
+              (when (and (slot-exists-p obj slot)
+                         (slot-boundp obj slot))
+                (return lp-context)))
+            (call-next-method)))))
 
 
 (json-ld:define-json-type (activity "Activity") (as/v/a:activity object) *litepub-uri*
