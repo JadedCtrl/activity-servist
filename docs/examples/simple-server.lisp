@@ -16,7 +16,8 @@
   (:export :start-server :seed)
   ;; Note that we use a nickname for the ActivityStreams vocab!
   ;; I recommend doing likewise; save yourself some typing!
-  (:local-nicknames (:as :activity-servist/vocab/activity)))
+  (:local-nicknames (:ass :activity-servist/vocab/activity)
+                    (:lp :activity-servist/vocab/litepub)))
 
 (in-package #:activitypub-example)
 
@@ -115,7 +116,7 @@ Otherwise, assume “https”."
 
 ;;; Users
 ;;; ————————————————————————————————————————
-(defclass user (as:person)
+(defclass user (ass:person lp:object)
   ((inbox
     :accessor user-inbox
     :initform nil
@@ -141,10 +142,10 @@ The ID and ENDPOINTS are derived using the parameter USERNAME and the global *US
                      (getf *config* :host) username)))
     (flet ((sub-uri (path)
              (format nil "~A/~A" uri path)))
-      (setf (as:name obj)      username)
+      (setf (ass:name obj)      username)
       (setf (json-ld:@id obj)  uri)
-      (setf (as:inbox obj)     (sub-uri "inbox"))
-      (setf (as:outbox obj)    (sub-uri "outbox"))
-      (setf (as:following obj) (sub-uri "following"))
-      (setf (as:followers obj) (sub-uri "followers")))
+      (setf (ass:inbox obj)     (sub-uri "inbox"))
+      (setf (ass:outbox obj)    (sub-uri "outbox"))
+      (setf (ass:following obj) (sub-uri "following"))
+      (setf (ass:followers obj) (sub-uri "followers")))
    obj))
