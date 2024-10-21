@@ -113,7 +113,9 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
                        (cddr (assoc property-name type-def :test #'equal))))))
     (let* ((class-name   (class-name (class-of obj)))
            (type-def     (cdr (class-json-type-definition class-name)))
-           (no-context-p (aliased-prop-p "@context" type-def))
+           ;; (@context is a special case; we should usually encode it.)
+           (no-context-p (and (aliased-prop-p "@context" type-def)
+                              (slot-value obj '@context)))
            (no-id-p      (aliased-prop-p "@id" type-def))
            (no-type-p    (aliased-prop-p "@type" type-def))
            (context      (@context obj))
@@ -476,19 +478,18 @@ objects, recursively. That is, redundant @CONTEXT-definitions are removed — we
 try to concentrate everything in the top-level object’s @CONTEXT slot.
 This is useful for ensuring the same @CONTEXT doesn’t get output a million times
 during JSON-encoding with YASON:ENCODE."
-  (loop for subobj in (cdr (contained-json-objects obj))
-        do
-           (progn
-             (let ((old-context    (@context obj))
-                   (old-subcontext (@context subobj)))
-               (when (and old-subcontext
-                          (not (equal old-context old-subcontext)))
-                 (setf (slot-value obj '@context)
-                       (append (if (listp old-context)
-                                   old-context
-                                   (list old-context))
-                               old-subcontext))))
-             (setf (slot-value subobj '@context) 'no-@context))))
+  (dolist (subobj (cdr (contained-json-objects obj)))
+    (progn
+      (let ((old-context    (@context obj))
+            (old-subcontext (@context subobj)))
+        (when (and old-subcontext
+                   (not (equal old-context old-subcontext)))
+          (setf (slot-value obj '@context)
+                (append (if (listp old-context)
+                            old-context
+                            (list old-context))
+                        old-subcontext))))
+      (setf (slot-value subobj '@context) 'no-@context))))
 
 (defun json-slot-values (obj)
   "Return the values of all registered slots/properties of a JSON-LD:OBJECT.
@@ -527,7 +528,9 @@ recursively. Lists, hash-tables, and the slots of JSON-LD:OBJECTs are explored."
     (object     (append
                  (list item)
                  (reduce
-                  (lambda (b c)
+                  (lambda (&optional b c)
+                    (or b
+                        (append b c))
                    (append b c))
                   (mapcar (lambda (a) (contained-json-objects a))
                           (json-slot-values item)))))))
@@ -665,7 +668,7 @@ Returns the first found matching file."
 in B. If CLOBBERP is set, pre-existing properties of B will be overwritten."
   (let ((a-keys (plist-keys a))
         (b-keys (plist-keys b)))
-    (loop for key in a-keys
-          do (when (or clobberp (not (find key b-keys)))
-               (setf (getf b key) (getf a key))))
+    (dolist (key a-keys)
+      (when (or clobberp (not (find key b-keys)))
+        (setf (getf b key) (getf a key))))
     b))
