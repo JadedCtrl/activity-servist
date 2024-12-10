@@ -21,6 +21,8 @@
   (:export
    ;; Functions
    :server :start-server
+   ;; Methods
+   :receive
    ;; Globals
    *config*))
 
@@ -74,6 +76,15 @@ Returns the ActivityPub object associated with the given URI."
     (if func
         (funcall func uri)
         (error "No FETCH function found in ACTIVITY-SERVIST:*CONFIG*."))))
+
+(defgeneric receive (obj)
+  (:documentation
+   "Called when an OBJECT is “sent” to activity-servist’s HTTP inbox.
+This is done by other servers, and is how activities and objects get federated
+with ActivityPub.
+To receive objects, you should overload this generic with (at the bare minimum)
+a method accepting JSON-LD:OBJECTs. Doing so is required — not defining this
+method will cause an error when an object is sent to the inbox."))
 
 
 
@@ -145,9 +156,11 @@ can be found). Uses the callback :FETCH, defined in *CONFIG*."
 ;;; Inbox requests
 ;;; ————————————————————————————————————————
 (defun http-inbox (env path-items params)
-  (let* ((raw-contents (alexandria:read-stream-content-into-byte-vector (getf env :raw-body)))
-         (contents (babel:octets-to-string raw-contents)))
-    '(400 (:content-type "text/plain") ("You tried!"))))
+  "If one tries to send an activity to our inbox, pass it along to
+the overloaded RECEIVE method."
+  (let* ((contents (body-contents (getf env :raw-body))))
+    (receive (json-ld:parse contents))
+    '(200 (:content-type "text/plain") ("You win!"))))
 
 
 
@@ -228,7 +241,7 @@ can be found). Uses the callback :FETCH, defined in *CONFIG*."
 ;;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request property-list ENV."
-  (setq *logs* (append *logs* (list env (body-contents (getf env :raw-body)))))
+  (setq *logs* (append *logs* (list env)))
   (let* ((path   (pathname-sans-parameters (getf env :request-uri)))
          (params (pathname-parameters      (getf env :request-uri)))
          (response-function
