@@ -212,7 +212,7 @@ can be found). Uses the callback :FETCH, defined in *CONFIG*."
 ;;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request property-list ENV."
-  (nconc *logs* (list env (babel:octets-to-string (alexandria:read-stream-content-into-byte-vector (getf env :raw-body)))))
+  (setq *logs* (append *logs* (list env (body-contents (getf env :raw-body)))))
   (let* ((path   (pathname-sans-parameters (getf env :request-uri)))
          (params (pathname-parameters      (getf env :request-uri)))
          (response-function
@@ -282,3 +282,9 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
           (loop for number across
                 sequence
                 collect (format nil "~X" number))))
+
+(defun body-contents (body)
+  "Given the :RAW-BODY of a Clack ENV, return its contents as a string."
+  (babel:octets-to-string
+   (alexandria:read-stream-content-into-byte-vector body)))
+
