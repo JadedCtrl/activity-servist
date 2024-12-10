@@ -29,12 +29,18 @@
 
 ;;; Globals
 ;;; ————————————————————————————————————————
-(defvar *config* '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080)
+(defvar *config* '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080
+                   :inbox-path "inbox")
   "Configuration for the server, a property-list.
 There are three optional properties:
 • :HOST, the public-facing URI of the server.
 • :ADDRESS, the address the server is exposed on.
 • :PORT, the port the server is exposed on.
+• :INBOX-PATH, the URI for your server’s shared/private inboxes.
+
+:INBOX-PATH is relative to :HOST; by default, it is “inbox”, which corresponds to
+“http://localhost:8080/inbox”. The recipient(s) of any objects sent to the
+inbox should be deduced by the objects’ contents.
 
 There is one required property:
 • :FETCH, a function used as a callback by activity-servist.
@@ -45,9 +51,10 @@ The URI parameter is going to be either an @ID or an account-URI of the form “
 
 (defun directories ()
   "Alist of the server's paths and their response functions."
-  '((".well-known/webfinger" . http-webfinger)
-    (".well-known/host-meta" . http-host-meta)
-    (""                      . http-object)))  ; By default, assume object.
+  `((".well-known/webfinger"      . http-webfinger)
+    (".well-known/host-meta"      . http-host-meta)
+    ("inbox"                      . http-inbox)
+    (""                           . http-object)))  ; By default, assume object.
 
 (defvar *privkey*
   (alexandria:read-file-into-string
@@ -132,6 +139,15 @@ can be found). Uses the callback :FETCH, defined in *CONFIG*."
               (list (yason:with-output-to-string* () (yason:encode-object obj))))
         `(400 (:content-type "text/plain")
           ("Such an object doesn’t exist!")))))
+
+
+
+;;; Inbox requests
+;;; ————————————————————————————————————————
+(defun http-inbox (env path-items params)
+  (let* ((raw-contents (alexandria:read-stream-content-into-byte-vector (getf env :raw-body)))
+         (contents (babel:octets-to-string raw-contents)))
+    '(400 (:content-type "text/plain") ("You tried!"))))
 
 
 
