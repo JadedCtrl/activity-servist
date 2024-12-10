@@ -28,7 +28,7 @@
   "Our “object-store” — stores all ActivityPub objects, mapped by their IRI @ID.")
 
 (defvar *config*
-  '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080 :fetch fetch))
+  '(:host "http://localhost:8080" :address "0.0.0.0" :port 8080 :fetch fetch))
 
 (defvar *user-id-format* "~A/users/~A"
   "The format we use for user’s @IDs/URIs.
@@ -51,16 +51,17 @@ For example: “https://localhost:8080/users/lena”.")
 
 (defun seed ()
   "Seed our server with some random users, for testing purposes."
-  (save (make-user "maria" "Maria ♥"))
+  (save (make-user "maria"   "Maria ^_^"))
   (save (make-user "melanie" "Melanie >:o"))
-  (save (make-user "jorge" "Jorge 🦆")))
+  (save (make-user "jorge"   "Jorge 🦆")))
 
 
 
 ;;; Activity-Servist callbacks
 ;;; ————————————————————————————————————————
 (defun fetch (uri)
-  "activity-servist callback); returns the JSON-LD-OBJECT of the given @ID or URI.
+  "activity-servist callback: Returns the JSON-LD-OBJECT of the given @ID or URI
+from our object-store.
 This example server simply stores objects in a hash-table mapping IDs to objects."
   (let ((id (or (uri->id uri) uri)))
     (gethash id *store*)))
@@ -142,10 +143,11 @@ The ID and ENDPOINTS are derived using the parameter USERNAME and the global *US
                      (getf *config* :host) username)))
     (flet ((sub-uri (path)
              (format nil "~A/~A" uri path)))
-      (setf (ass:name obj)      username)
-      (setf (json-ld:@id obj)  uri)
+      (setf (ass:preferred-username obj) username)
+      (setf (ass:name obj)      nickname)
       (setf (ass:inbox obj)     (sub-uri "inbox"))
       (setf (ass:outbox obj)    (sub-uri "outbox"))
       (setf (ass:following obj) (sub-uri "following"))
-      (setf (ass:followers obj) (sub-uri "followers")))
+      (setf (ass:followers obj) (sub-uri "followers"))
+      (setf (json-ld:@id obj)   uri))
    obj))
