@@ -135,7 +135,7 @@ can be found). Uses the callback :FETCH, defined in *CONFIG*."
                      (append (list (getf *config* :host)) path-items)))
          (obj (fetch uri)))
     (if obj
-        (list 200 '(:content-type "application/json")
+        (list 200 '(:content-type "application/activity+json")
               (list (yason:with-output-to-string* () (yason:encode-object obj))))
         `(400 (:content-type "text/plain")
           ("Such an object doesn’t exist!")))))
