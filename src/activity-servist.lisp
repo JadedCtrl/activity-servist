@@ -77,14 +77,52 @@ Returns the object associated with the given URI from our object-store."
         (funcall func uri)
         (error "No RETRIEVE function found in ACTIVITY-SERVIST:*CONFIG*."))))
 
+
 (defgeneric receive (obj)
   (:documentation
    "Called when an OBJECT is “sent” to activity-servist’s HTTP inbox.
 This is done by other servers, and is how activities and objects get federated
 with ActivityPub.
+
 To receive objects, you should overload this generic with (at the bare minimum)
 a method accepting JSON-LD:OBJECTs. Doing so is required — not defining this
-method will cause an error when an object is sent to the inbox."))
+method will cause an error when an object is sent to the inbox.
+
+By default, there is a :BEFORE-method defined, which fetches received Activity’s
+Actors, and then calls RECEIVE on them in turn."))
+
+
+;; We want to make sure that activity’s actors are being retrieved and stored,
+;; so that we can validate HTTP signatures (when that gets implemented).
+(defmethod receive :before ((obj activity-vocabulary:activity))
+  (let* ((actor-uri (ignore-errors (activity-vocabulary:actor obj))))
+    (when actor-uri
+      (or (retrieve actor-uri)
+          (fetch-and-receive actor-uri)))))
+
+
+
+
+;;; Fetching foreign objects
+;;; ————————————————————————————————————————
+;; “I will stab you in the eye, with a foreign object.”
+;;    — The Mountain Goats, “Foreign Object” (2015)
+
+(defun fetch (obj-uri)
+  "Fetch & parse an ActivityPub object from a foreign server; returning the object"
+  (let ((json
+          (dexador:get obj-uri :headers '(("Accept" . "application/activity+json")))))
+    (json-ld:parse json)))
+
+(defun fetch-and-receive (obj-uri)
+  "Fetch & pars an ActivityPub object from a foreign server; then try to pass it
+along to our server.
+If it RECEIVEs sans an error (de-facto rejecting the object), return the parsed object.
+Otherwise, nil."
+  (let ((obj (fetch obj-uri)))
+    (when (and obj (ignore-errors (receive obj)))
+      obj)))
+
 
 
 
