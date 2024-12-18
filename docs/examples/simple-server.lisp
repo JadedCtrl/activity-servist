@@ -31,7 +31,7 @@
   "Our inbox, a simple list containing all received objects.")
 
 (defvar *config*
-  '(:host "http://localhost:8080" :address "0.0.0.0" :port 8080 :fetch fetch))
+  '(:host "http://localhost:8080" :address "0.0.0.0" :port 8080 :retrieve retrieve))
 
 (defvar *user-id-format* "~A/users/~A"
   "The format we use for user’s @IDs/URIs.
@@ -62,7 +62,7 @@ For example: “https://localhost:8080/users/lena”.")
 
 ;;; Activity-Servist callbacks
 ;;; ————————————————————————————————————————
-(defun fetch (uri)
+(defun retrieve (uri)
   "activity-servist callback: Returns the JSON-LD OBJECT of the given @ID or URI
 from our object-store.
 This example server simply stores objects in a hash-table mapping IDs to objects."

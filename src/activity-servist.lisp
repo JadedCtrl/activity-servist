@@ -45,9 +45,9 @@ There are three optional properties:
 inbox should be deduced by the objects’ contents.
 
 There is one required property:
-• :FETCH, a function used as a callback by activity-servist.
+• :RETRIEVE, a function used as a callback by activity-servist.
 
-:FETCH should be a function of (FETCH URI)
+:RETRIEVE should be a function of (RETRIEVE URI)
 This function should simply return an object from your storage, queried by a URI.
 The URI parameter is going to be either an @ID or an account-URI of the form “acct:username@hostname”.")
 
@@ -69,13 +69,13 @@ The URI parameter is going to be either an @ID or an account-URI of the form “
 
 ;;; Callbacks
 ;;; ————————————————————————————————————————
-(defun fetch (uri)
-  "Runs the user-defined callback FETCH, as stored in *CONFIG*.
-Returns the ActivityPub object associated with the given URI."
-  (let ((func (getf *config* :fetch)))
+(defun retrieve (uri)
+  "Runs the user-defined callback RETRIEVE, as stored in *CONFIG*.
+Returns the object associated with the given URI from our object-store."
+  (let ((func (getf *config* :retrieve)))
     (if func
         (funcall func uri)
-        (error "No FETCH function found in ACTIVITY-SERVIST:*CONFIG*."))))
+        (error "No RETRIEVE function found in ACTIVITY-SERVIST:*CONFIG*."))))
 
 (defgeneric receive (obj)
   (:documentation
@@ -110,7 +110,7 @@ method will cause an error when an object is sent to the inbox."))
 (defun webfinger-resource-info (resource)
   "Given a Webfinger RESOURCE, return a property-list of data on the given resource.
 Will "
-  (let ((obj (fetch resource)))
+  (let ((obj (retrieve resource)))
     (and obj (webfinger-info resource obj))))
 
 (defgeneric webfinger-info (resource obj)
@@ -141,10 +141,10 @@ For information on the property-list’s format, see the dosctring of WEBTENTACL
 ;;; ————————————————————————————————————————
 (defun http-object (env path-items params)
   "If an ActivityPub object is requested, serve it (if such an object
-can be found). Uses the callback :FETCH, defined in *CONFIG*."
+can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
   (let* ((uri (reduce (lambda (a b) (format nil "~A/~A" a b))
                      (append (list (getf *config* :host)) path-items)))
-         (obj (fetch uri)))
+         (obj (retrieve uri)))
     (if obj
         (list 200 '(:content-type "application/activity+json")
               (list (yason:with-output-to-string* () (yason:encode-object obj))))
