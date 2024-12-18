@@ -39,24 +39,22 @@ canonical URL for it. This URI will be used in encoded LITEPUB:OBJECTs in the
 @CONTEXT.
 Defaults to a copy at jam.xwx.moe — because why not? ¯\_(ツ)_/¯")
 
-(unless +new-classes+
-  (defconstant +new-classes+ '(chat-message emoji emoji-react hashtag property-value)
-    "Simple list of classes/JSON types defined in this package.
-Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context."))
+(defvar +new-classes+ '(chat-message emoji emoji-react hashtag property-value)
+  "Simple list of classes/JSON types defined in this package.
+Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context.")
 
 ;; This isn’t pretty… but it helps us avoid bringing in another dependency! :^)
 ;; (closer-mop, that is.)
-(unless +new-slots+
-  (defconstant +new-slots+
-    '(atom-uri sensitivep non-anonymous direct-message-p former-representations
-      public-key discoverablep manually-approves-followers-p also-known-as
-      capabilities            ; Object ←↑
-      invisiblep list-message ; Activity
-      conversation            ; Update
-      quote-url quote-uri)    ; Note
-    "List of slots added to subclasses corresponding AS/VOCAB/ACTIVITY classes.
+(defvar +new-slots+
+  '(atom-uri sensitivep non-anonymous direct-message-p former-representations
+    public-key discoverablep manually-approves-followers-p also-known-as
+    capabilities            ; Object ←↑
+    invisiblep list-message ; Activity
+    conversation            ; Update
+    quote-url quote-uri)    ; Note
+  "List of slots added to subclasses corresponding AS/VOCAB/ACTIVITY classes.
 For example, slots in our OBJECT that aren’t in AS/V/A:OBJECT.
-Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context."))
+Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context.")
 
 
 ;;; Core types
@@ -115,6 +113,12 @@ One known capabilitity-name is Pleroma’s “acceptsChatMessages”.")))
                          (slot-boundp obj slot))
                 (return lp-context)))
             (call-next-method)))))
+
+
+;; We want our new Actor-specific slots to take effect.
+(json-ld:define-json-type (person "Person") (as/v/a:actor object) *litepub-uri*
+  ()
+  (:documentation "Represents an individual person."))
 
 
 (json-ld:define-json-type (activity "Activity") (as/v/a:activity object) *litepub-uri*
