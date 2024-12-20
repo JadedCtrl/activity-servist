@@ -76,6 +76,12 @@ inbox, and decide what to do with it!"
   (setq *inbox* (append *inbox* (list obj))))
 
 
+(defmethod as:store ((obj json-ld:object))
+  "activity-servist callback: Store a foreign JSON-LD OBJECT (fetched during
+operation of the server) in our object-store."
+  (setf (gethash (json-ld:@id obj) *store*) obj))
+
+
 
 ;;; ID-management
 ;;; ————————————————————————————————————————
@@ -113,14 +119,6 @@ Otherwise, assume “https”."
     (if (equal (quri:uri-host (quri:uri our-host)) hostname)
         our-host
         (format nil "https://~A" hostname))))
-
-
-
-;;; Data-management
-;;; ————————————————————————————————————————
-(defun save (obj)
-  "Save an object to our object-store, *STORE*."
-  (setf (gethash (json-ld:@id obj) *store*) obj))
 
 
 

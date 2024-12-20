@@ -22,11 +22,12 @@
    ;; Functions
    :server :start-server
    ;; Methods
-   :receive
+   :receive :store
    ;; Globals
    *config*))
 
 (in-package #:activity-servist)
+(defvar *last* nil)
 
 
 ;;; Globals
@@ -98,8 +99,17 @@ Actors, and then calls RECEIVE on them in turn."))
   (let* ((actor-uri (ignore-errors (activity-vocabulary:actor obj))))
     (when actor-uri
       (or (retrieve actor-uri)
-          (fetch-and-receive actor-uri)))))
+          (fetch-and-store actor-uri)))))
 
+
+(defgeneric store (obj)
+  (:documentation
+   "Stores an object in a object-store accessible with the callback function
+RETRIEVE, likely for caching purposes.
+
+You should overload this generic with a method accepting JSON-LD:OBJECTs, as it
+is necessary for activity-servist to function. When called by activity-servist,
+this is solely used to store fetched foreign objects."))
 
 
 
