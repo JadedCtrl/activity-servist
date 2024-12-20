@@ -124,15 +124,83 @@ this is solely used to store fetched foreign objects."))
           (dexador:get obj-uri :headers '(("Accept" . "application/activity+json")))))
     (json-ld:parse json)))
 
-(defun fetch-and-receive (obj-uri)
-  "Fetch & pars an ActivityPub object from a foreign server; then try to pass it
-along to our server.
-If it RECEIVEs sans an error (de-facto rejecting the object), return the parsed object.
+
+(defun fetch-and-store (obj-uri)
+  "Fetch & parses an ActivityPub object from a foreign server; then try to pass it
+along to our server for caching.
+If it STOREs sans an error (de-facto rejecting the object), return the parsed object.
 Otherwise, nil."
   (let ((obj (fetch obj-uri)))
-    (when (and obj (ignore-errors (receive obj)))
+    (when (and obj (ignore-errors (store obj)))
       obj)))
 
+
+(defun retrieve-or-fetch (obj-uri)
+  "Attempt to RETRIEVE an ActivityPub object of the given OBJ-URI ID.
+If not retrieved from the object store, then FETCH-AND-STORE it there.
+Returns the object if it was retrieved or fetched; nil otherwise."
+  (or (retrieve obj-uri)
+      (fetch-and-store obj-uri)))
+
+
+
+;;; Signature HTTP-header parsing
+;;; ————————————————————————————————————————
+(defun signature-header-parse (signature-header)
+  "Parses the signature header into an associative list of the form:
+  '((:KEYID     . “https://jam.xwx.moe/users/jadedctrl#main-key”)
+    (:ALGORITHM . “rsa-sha256”)
+    (:HEADERS   . “(request-target) content-length date digest host”)
+    (:SIGNATURE . “⋯”))"
+  (mapcar (lambda (key=value)
+            (destructuring-bind (key value)
+                (str:split
+                 #\≝ (str:replace-first "=" "≝" key=value)) ; Since a value might contain “=”
+              (cons (intern (string-upcase key) "KEYWORD")
+                    (string-trim '(#\") value))))
+          (str:split #\, signature-header)))
+
+
+
+;;; Fetching public keys
+;;; ————————————————————————————————————————
+;; https://swicg.github.io/activitypub-http-signature/#how-to-obtain-a-signature-s-public-key
+(defun signature-key (signature-alist)
+  "Return a public key corresponding to the given an HTTP signature’s
+SIGNATURE-ALIST (of SIGNATURE-HEADER-PARSE’s format).
+
+Public keys are hash-tables, which should look more-or-less like so:
+  @id = https://jam.xwx.moe/users/jadedctrl#main-key
+  https://w3id.org/security#owner = https://jam.xwx.moe/users/jadedctrl
+  https://w3id.org/security#publicKeyPem = -----BEGIN PUBLIC KEY-----[⋯]"
+  (actor-key-of-id (signature-key-owner signature-alist)
+                   (cdr (assoc :keyid signature-alist))))
+
+
+(defun signature-key-owner (signature-alist)
+  "Return a the owning actor (likely as a LITEPUB:PERSON) of the public key
+corresponding to the given SIGNATURE-ALIST (of SIGNATURE-HEADER-PARSE's format)."
+  (let* ((key-uri         (cdr (assoc :keyid signature-alist)))
+         (maybe-owner-uri (car (str:split #\# key-uri)))
+         ;; A common URI for keys is /users/user#keyname; so we try to save an HTTP request by
+         ;; checking the object store for /users/user as an ID.
+         (data            (or (retrieve          maybe-owner-uri)
+                              (retrieve-or-fetch key-uri))))
+    (typecase data
+      (hash-table
+       (retrieve-or-fetch (gethash "https://w3id.org/security#owner" result)))
+      (litepub:person
+       data))))
+
+
+(defun actor-key-of-id (actor id)
+  "Search through an ActivityPub ACTOR’s public keys, returning the one
+whose @id matches ID.
+The public key will be a hash-table; see SIGNATURE-KEY’s docstring for info."
+  (let* ((key-or-keys (ignore-errors (litepub:public-key actor)))
+         (keys        (if (listp key-or-keys) key-or-keys (list key-or-keys))))
+    (find id keys :test (lambda (key-id key)
+                          (equal (gethash "@id" key) key-id)))))
 
 
 
