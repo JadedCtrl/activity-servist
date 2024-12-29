@@ -160,6 +160,33 @@ Returns the object if it was retrieved or fetched; nil otherwise."
                     (string-trim '(#\") value))))
           (str:split #\, signature-header)))
 
+(defun signed-string (env signature-alist)
+  "Generate the string that was signed for the signature-header of the Clack HTTP request ENV."
+  (let* ((headers         (getf env :headers))
+         (header-names    (signed-header-names signature-alist)))
+    (reduce
+     (lambda (a b) (format nil "~A~%~A" a b))
+     (mapcar
+      (lambda (header-name)
+        (str:string-case (string-downcase header-name)
+          ;; (request-target) is a pseudo-header formatted like “post /inbox”.
+          ("(request-target)"
+           (format nil "~A: ~A ~A"
+                   header-name
+                   (string-downcase (symbol-name (getf env :request-method)))
+                   (getf env :path-info)))
+          ;; Calculate digest ourselves; never can’t trust the enemy!
+          ("digest"
+           (format nil "~A: SHA-256=~A" header-name (string-sha256sum (body-contents env))))
+          ;; … we can trust them on everything else, tho.
+          (otherwise
+           (format nil "~A: ~A" header-name (gethash header-name headers)))))
+      header-names))))
+
+(defun signed-header-names (signature-alist)
+  "Return a list of the names of headers used in a SIGNATURE-ALIST’s signed string."
+  (str:split #\space (cdr (assoc :headers signature-alist)) :omit-nulls 't))
+
 
 
 ;;; Fetching public keys
@@ -274,9 +301,10 @@ can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
 (defun http-inbox (env path-items params)
   "If one tries to send an activity to our inbox, pass it along to
 the overloaded RECEIVE method."
-  (let* ((contents (body-contents (getf env :raw-body))))
+  (let* ((contents (body-contents env)))
     (receive (json-ld:parse contents))
     '(200 (:content-type "text/plain") ("You win!"))))
+
 
 
 
@@ -383,6 +411,19 @@ the overloaded RECEIVE method."
 
 ;;; Utils.
 ;;; ————————————————————————————————————————
+(defun body-contents (env)
+  "Given a Clack HTTP request property-list ENV, return the request’s body
+contents as a string. They are read from :RAW-BODY in this plist.
+
+If the contents are a stream, the stream’s contents will be read into a
+string and the stream’s object in ENV will be replaced with the string."
+  (let ((body (getf env :raw-body)))
+    (if (stringp body)
+        body
+        (setf (getf env :raw-body)
+              (babel:octets-to-string
+               (alexandria:read-stream-content-into-byte-vector body))))))
+
 (defun assoc-by-path (alist path-items &optional (depth 0))
   "Given an associative list and a path decomposed into a list of
 its components, return the item with the closest according
@@ -427,9 +468,3 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
           (loop for number across
                 sequence
                 collect (format nil "~X" number))))
-
-(defun body-contents (body)
-  "Given the :RAW-BODY of a Clack ENV, return its contents as a string."
-  (babel:octets-to-string
-   (alexandria:read-stream-content-into-byte-vector body)))
-
