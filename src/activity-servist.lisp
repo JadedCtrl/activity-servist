@@ -56,10 +56,10 @@ The URI parameter is going to be either an @ID or an account-URI of the form “
 
 (defun directories ()
   "Alist of the server's paths and their response functions."
-  `((".well-known/webfinger"      . http-webfinger)
-    (".well-known/host-meta"      . http-host-meta)
-    ("inbox"                      . http-inbox)
-    (""                           . http-object)))  ; By default, assume object.
+  `((".well-known/webfinger" . http-webfinger)
+    (".well-known/host-meta" . http-host-meta)
+    ("inbox"                 . http-inbox)
+    (""                      . http-object)))  ; By default, assume object.
 
 (defvar *privkey*
   (alexandria:read-file-into-string
@@ -80,7 +80,6 @@ Returns the object associated with the given URI from our object-store."
         (funcall func uri)
         (error "No RETRIEVE function found in ACTIVITY-SERVIST:*CONFIG*."))))
 
-
 (defgeneric receive (obj)
   (:documentation
    "Called when an OBJECT is “sent” to activity-servist’s HTTP inbox.
@@ -94,7 +93,6 @@ method will cause an error when an object is sent to the inbox.
 By default, there is a :BEFORE-method defined, which fetches received Activity’s
 Actors, and then calls RECEIVE on them in turn."))
 
-
 ;; We want to make sure that activity’s actors are being retrieved and stored,
 ;; so that we can validate HTTP signatures (when that gets implemented).
 (defmethod receive :before ((obj activity-vocabulary:activity))
@@ -102,7 +100,6 @@ Actors, and then calls RECEIVE on them in turn."))
     (when actor-uri
       (or (retrieve actor-uri)
           (fetch-and-store actor-uri)))))
-
 
 (defgeneric store (obj)
   (:documentation
@@ -126,7 +123,6 @@ this is solely used to store fetched foreign objects."))
           (dexador:get obj-uri :headers '(("Accept" . "application/activity+json")))))
     (json-ld:parse json)))
 
-
 (defun fetch-and-store (obj-uri)
   "Fetch & parses an ActivityPub object from a foreign server; then try to pass it
 along to our server for caching.
@@ -135,7 +131,6 @@ Otherwise, nil."
   (let ((obj (fetch obj-uri)))
     (when (and obj (ignore-errors (store obj)))
       obj)))
-
 
 (defun retrieve-or-fetch (obj-uri)
   "Attempt to RETRIEVE an ActivityPub object of the given OBJ-URI ID.
@@ -343,7 +338,8 @@ Will "
 
 (defgeneric webfinger-info (resource obj)
   (:documentation "Returns a property-list of Webfinger data on the given object.
-Override this to provide custom Webfinger data; do what you please, but make sure RESOURCE is set as the :SUBJECT value.
+Override this to provide custom Webfinger data; do what you please, but make sure
+RESOURCE is set as the :SUBJECT value.
 
 For information on the property-list’s format, see the dosctring of WEBTENTACLE:SERVER."))
 
