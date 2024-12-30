@@ -19,13 +19,13 @@
   (:use #:cl)
   (:nicknames "AS/S")
   (:export :generate-key-pair
-           :sign-string :import-pem-key-pair
-           :digest-string :string-sha256sum))
+           :sign-string :signature-valid-p
+           :string-sha256sum))
 
 (in-package #:activity-servist/signatures)
 
 
-;;; Key creation/parsing
+;;; Key-generation
 ;;; ————————————————————————————————————————
 ;; At the moment, I’ve yet to use figure out how to create PEM representations of
 ;; a public keypair properly in Lisp.
@@ -36,131 +36,77 @@
 ;; But at the moment,I want to focus on other core parts of ActivityPub; I’ve
 ;; tired of messing with ASN1 & co. That’s for another day! ^^
 
-
 (defun generate-key-pair ()
-  "Generate a 2048-bit RSA key-pair in PEM-format using one’s `openssl` binary.
+  "Generate a 2048-bit RSA key-pair in PEM-format using the host system’s `openssl` binary.
 It returns two values: The private key, then the public key."
   (let* ((private-pem-key (inferior-shell:run/s "openssl genrsa 2048"))
          (public-pem-key
-           (inferior-shell:run/s
-            `(inferior-shell:pipe (echo ,private-pem-key)
-                                  (openssl rsa -outform PEM -pubout)))))
+           (with-temporary-file (private-key-path "activityservist-" private-pem-key)
+             (inferior-shell:run/s
+              `(openssl rsa -outform pem -pubout -in ,private-key-path)))))
     (values private-pem-key
             public-pem-key)))
 
-(defun destructure-openssl-private-key (pem-string &optional results)
-  "When passed the output of the shell command `openssl rsa -text -noout`, will
-parse the output into a plist containing relavent numbers:
-  :n (modulus), :e (public exponent), :d (private exponent), :p (1st prime),
-  :q (2nd prime), :e1 (1st exponent), :e2 (2nd exponent), and :c (coefficient)."
-  (let* ((lines (if (stringp pem-string)
-                    (inferior-shell:run/lines
-                     `(inferior-shell:pipe
-                       (echo ,pem-string)
-                       (openssl rsa -text -noout)))
-                    pem-string))
-         (line (str:trim (car lines))))
-    (cond
-      ((not lines)
-       (mapcar
-        (lambda (result-item)
-          (if (stringp result-item)
-              (parse-integer (str:replace-all ":" "" result-item) :radix 16)
-              result-item))
-        results))
-      ((str:starts-with-p "Private" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) results))
-      ((str:starts-with-p "modulus:" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:n))))
-      ((str:starts-with-p "prime1" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:p))))
-      ((str:starts-with-p "prime2" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:q))))
-      ((str:starts-with-p "exponent1" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:e1))))
-      ((str:starts-with-p "exponent2" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:e2))))
-      ((str:starts-with-p "coefficient" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:c))))
-      ((str:starts-with-p "privateExponent" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines) (nconc results '(:d))))
-      ((str:starts-with-p "publicExponent" line)
-       (openssl-shell-destructure-private-key
-        (cdr lines)
-        (nconc
-         results
-         (list
-          :e
-          (parse-integer
-           (car (str:split #\space
-                           (str:replace-first
-                            "publicExponent: "
-                            ""
-                            line))))))))
-      ('t
-       (let* ((last-element (car (last results)))
-              (total-string (if (stringp last-element)
-                                (str:concat last-element line)
-                                line)))
-         (openssl-shell-destructure-private-key
-          (cdr lines)
-          (if (stringp last-element)
-              (nconc (reverse (cdr (reverse results)))
-                     (list total-string))
-              (nconc results
-                     (list total-string)))))))))
-
-(defun import-pem-key-pair (private-pem-string)
-  "Given the string value of a private RSA PEM file, this will parse it into two
-returned values: An Ironclad private key, and an Ironclad public key."
-  (let ((key-values
-          (openssl-shell-destructure-private-key private-pem-string)))
-    (values (ironclad:make-private-key
-             :rsa
-             :n (getf key-values :n)
-             :e (getf key-values :e)
-             :d (getf key-values :d)
-             :p (getf key-values :p)
-             :q (getf key-values :q))
-            (ironclad:make-public-key
-             :rsa
-             :n (getf key-values :n)
-             :e (getf key-values :e)))))
-
 
 
-;;; Signing
+;;; Signing & verification
 ;;; ————————————————————————————————————————
 (defun sign-string (private-pem-string string)
-  "Use the OpenSSL binary on the host system to RSS-SHA256 sign a STRING with a
-private key."
-  (alexandria:write-string-into-file private-pem-string #p"/tmp/private.pem" :if-does-not-exist :create :if-exists :overwrite)
-  (apply #'str:concat
-         (inferior-shell:run/lines
-          `(inferior-shell:pipe
-            (printf ,string)
-            (openssl dgst -sha256 -sign /tmp/private.pem -)
-            (base64)))))
+  "RSA-SHA256 signs a STRING with a private key, returning a base64 string.
+Uses the host-system’s `base64`, `openssl`, & `printf` binaries."
+  (with-temporary-file (key-pathname "activityservist-" private-pem-string)
+    (inferior-shell:run/s
+     `(inferior-shell:pipe
+       (printf ,string)
+       (openssl dgst -sha256 -sign ,key-pathname -)
+       (base64)))))
+
+(defun signature-valid-p (public-pem-string string signature)
+  "Check the validity of a RSA-SHA256 SIGNATURE of a STRING.
+SIGNATURE should be a base64 string.
+Uses the host-system’s `openssl` & `printf` binaries."
+  (handler-case
+      (let ((signature-usb8-array (base64:base64-string-to-usb8-array signature)))
+        (with-temporary-file   (key-pathname "activityservist-" public-pem-string)
+          (with-temporary-file (sig-pathname "activityservist-" signature-usb8-array)
+            (inferior-shell:run/lines
+             `(inferior-shell:pipe
+               (printf ,string)
+               (openssl dgst -sha256 -verify ,key-pathname -signature ,sig-pathname -))))))
+    ;; An exit-code of 1 means signature-verification failed. Anything else is
+    ;; probably an actual error.
+    (uiop/run-program:subprocess-error (err)
+      (if (eq (slot-value err 'uiop/run-program::code) 1)
+          nil
+          (error err)))))
 
 
 
 ;;; Misc.
 ;;; ————————————————————————————————————————
+(defun string-sha256sum (string)
+  "Compute the sha256 checksum of a STRING, in hexadecimal string-format."
+  (base64:usb8-array-to-base64-string
+   (digest-string (ironclad:make-digest :sha256) string)))
+
 (defun digest-string (digest-spec string)
   "Compute the digest of a STRING, given an Ironclad DIGEST-SPEC."
   (ironclad:digest-sequence
    digest-spec
    (flexi-streams:string-to-octets string :external-format 'utf-8)))
 
-(defun string-sha256sum (string)
-  "Compute the sha256 checksum of a STRING, in hexadecimal string-format."
-  (base64:usb8-array-to-base64-string
-   (digest-string (ironclad:make-digest :sha256) string)))
+(defmacro with-temporary-file (varspec &body body)
+  "A wrapper around UIOP:WITH-TEMPORARY-FILE that ensures the file is only readable
+by the current process’es user, and writes a default content-string to it.
+
+VARSPEC should be of the form: (PATH-SYM PREFIX-STRING CONTENT-STRING-OR-USB8-ARRAY)"
+  (destructuring-bind (pathname prefix contents)
+      varspec
+    `(uiop:with-temporary-file (:pathname ,pathname :prefix ,prefix)
+       (setf (osicat:file-permissions ,pathname) '(:user-read :user-write))
+       (typecase ,contents
+         (string
+          (alexandria:write-string-into-file ,contents ,pathname :if-exists :overwrite))
+         ((simple-array (unsigned-byte 8))
+          (alexandria:write-byte-vector-into-file ,contents ,pathname :if-exists :overwrite)))
+       ,@body)))

@@ -65,7 +65,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :depends-on (:cl-base64 :flexi-streams :inferior-shell :ironclad :str)
+  :depends-on (:cl-base64 :flexi-streams :inferior-shell :ironclad :osicat)
   :components ((:file "src/signatures")))
 
 
