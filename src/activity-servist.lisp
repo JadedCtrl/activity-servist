@@ -24,10 +24,9 @@
    ;; Methods
    :receive :store
    ;; Globals
-   *config*))
+   *config* *debug* *logs*))
 
 (in-package #:activity-servist)
-(defvar *last* nil)
 
 
 ;;; Globals
@@ -51,6 +50,9 @@ There is one required property:
 :RETRIEVE should be a function of (RETRIEVE URI)
 This function should simply return an object from your storage, queried by a URI.
 The URI parameter is going to be either an @ID or an account-URI of the form “acct:username@hostname”.")
+
+(defvar       *logs*  nil "A list of incoming Clack HTTP requests, used for debugging.")
+(defparameter *debug* nil "Whether or not debugging-mode is on. More verbose errors, detailed logging, etc.")
 
 (defun directories ()
   "Alist of the server's paths and their response functions."
@@ -227,8 +229,14 @@ Will error our if the request’s Digest or Date headers don’t match our calcu
   "Return a list of the names of headers used in a SIGNATURE-ALIST’s signed string."
   (str:split #\space (cdr (assoc :headers signature-alist)) :omit-nulls 't))
 
-(define-condition invalid-signature (condition)
+(define-condition http-result (condition)
+  ((status  :initarg :status  :initform 500 :reader http-status)
+   (message :initarg :message :initform nil :reader http-message))
+  (:documentation "A condition that can be returned as an HTTP result."))
+
+(define-condition invalid-signature (http-result)
   ()
+  (:default-initargs :status 401)
   (:documentation "Thrown when validation of an HTTP signature fails."))
 
 (define-condition no-signature-header (invalid-signature)
@@ -368,8 +376,8 @@ can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
     (if obj
         (list 200 '(:content-type "application/activity+json")
               (list (yason:with-output-to-string* () (yason:encode-object obj))))
-        `(400 (:content-type "text/plain")
-          ("Such an object doesn’t exist!")))))
+        `(404 (:content-type "text/plain")
+          ("Nobody here but us chickens! 🐓")))))
 
 
 
@@ -381,13 +389,11 @@ the overloaded RECEIVE method."
   (let* ((contents (body-contents env)))
     (multiple-value-bind (signature-valid-p signature-error)
         (signature-valid-p env)
-      (if (not signature-valid-p)
-          `(401 (:content-type "text/plain")
-                (,(if signature-error
-                      (princ-to-string signature-error)
-                      "Failed to verify signature. Heck! TvT")))
-          (and (receive (json-ld:parse contents))
-               '(200 (:content-type "text/plain") ("You win!")))))))
+      (cond (signature-error (signal signature-error))
+            ((not signature-valid-p)
+             (signal 'http-result :status 401 :message "Failed to verify signature. Heck! TvT"))
+            ((receive (json-ld:parse contents))
+             '(200 (:content-type "text/plain") ("You win!")))))))
 
 
 
@@ -458,9 +464,7 @@ the overloaded RECEIVE method."
 (defun http-404 (env path-items params)
   "The default 404 response."
   '(404 (:content-type "text/plain")
-    ("404, you goddamn fool!")))
-
-(defvar *logs* '())
+    ("Nobody here but us chickens! 🐓")))
 
 
 
@@ -468,19 +472,31 @@ the overloaded RECEIVE method."
 ;;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request property-list ENV."
-  (setq *logs* (append *logs* (list env)))
-  (let* ((path   (pathname-sans-parameters (getf env :request-uri)))
-         (params (pathname-parameters      (getf env :request-uri)))
-         (response-function
-           (or (assoc-by-path (directories) (pathname-components path))
-               '("" . http-404)))
-         ;; So that response functions only deal with relative paths…
-         (path-sans-response-root
-           (pathname-components
-            (str:replace-first (car response-function) "" path))))
-    (format nil "Path: ~s" path)
-    (or (funcall (cdr response-function) env path-sans-response-root params)
-        (funcall 'http-404 env path-sans-response-root params))))
+  (logs-push env)
+  (handler-case
+      (let* ((path   (pathname-sans-parameters (getf env :request-uri)))
+             (params (pathname-parameters      (getf env :request-uri)))
+             (response-function
+               (or (assoc-by-path (directories) (pathname-components path))
+                   '("" . http-404)))
+             ;; So that response functions only deal with relative paths…
+             (path-sans-response-root
+               (pathname-components
+                (str:replace-first (car response-function) "" path))))
+        (or (funcall (cdr response-function) env path-sans-response-root params)
+            (funcall 'http-404 env path-sans-response-root params)))
+    ;; For our pretty user-facing errors, return the status and message.
+    (http-result (err)
+      (logs-push err)
+      `(,(slot-value  err 'status) (:content-type "text/plain")
+        (,(or (slot-value err 'message)
+              (princ-to-string err)))))
+    ;; For non-pretty errors, give a cryptic message (unless in *debug*-mode).
+    (condition (err)
+      (logs-push err)
+      `(500 (:content-type "text/plain")
+            (,(or (and *debug* (princ-to-string err))
+                  "I am ERROR. 🥴"))))))
 
 (defun start-server ()
   "Start the server."
@@ -506,6 +522,11 @@ string and the stream’s object in ENV will be replaced with the string."
         (setf (getf env :raw-body)
               (babel:octets-to-string
                (alexandria:read-stream-content-into-byte-vector body))))))
+
+(defun logs-push (item)
+  "Prepends ITEM to *LOGS*, if we are in *DEBUG* mode."
+  (when *debug*
+    (setq *logs* (append (list item) *logs*))))
 
 (defun assoc-by-path (alist path-items &optional (depth 0))
   "Given an associative list and a path decomposed into a list of
