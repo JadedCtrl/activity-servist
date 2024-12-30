@@ -16,7 +16,7 @@
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 (defpackage #:activity-servist
-  (:use #:cl #:activity-servist/signatures)
+  (:use #:cl)
   (:nicknames "AS" "ACTIVITYPUB")
   (:export
    ;; Functions
@@ -146,6 +146,31 @@ Returns the object if it was retrieved or fetched; nil otherwise."
 
 ;;; Signature HTTP-header parsing
 ;;; ————————————————————————————————————————
+(defun signature-valid-p (env &key (current-time (get-universal-time)))
+  "Return whether or not the Clack HTTP-request ENV’s signature is valid.
+Only RSA-SHA256 signatures are supported.
+Might provide a condition detailing the reason of the signature’s invalidity as
+a second return-value.
+
+Follows (mostly) the specification of:
+https://swicg.github.io/activitypub-http-signature/"
+  (handler-case
+      (let* ((headers          (getf env :headers))
+             (signature-header (gethash "signature" headers))
+             (signature-alist  (if signature-header
+                                   (signature-header-parse signature-header)
+                                   (signal 'no-signature-header)))
+             (algorithm        (assoc :algorithm signature-alist))
+             (signed-str       (signed-string env signature-alist :current-time current-time)))
+        (when (and algorithm (not (string-equal (cdr algorithm) "rsa-sha256")))
+          (signal 'invalid-signature-algorithm :algorithm (cdr algorithm)))
+        (list
+         (gethash "https://w3id.org/security#publicKeyPem" (signature-key signature-alist))
+         signed-str
+         (cdr (assoc :signature signature-alist))))
+    (invalid-signature (err)
+      (values nil err))))
+
 (defun signature-header-parse (signature-header)
   "Parses the signature header into an associative list of the form:
   '((:KEYID     . “https://jam.xwx.moe/users/jadedctrl#main-key”)
@@ -160,32 +185,84 @@ Returns the object if it was retrieved or fetched; nil otherwise."
                     (string-trim '(#\") value))))
           (str:split #\, signature-header)))
 
-(defun signed-string (env signature-alist)
-  "Generate the string that was signed for the signature-header of the Clack HTTP request ENV."
-  (let* ((headers         (getf env :headers))
-         (header-names    (signed-header-names signature-alist)))
+(defun signed-string (env signature-alist &key (current-time (get-universal-time)))
+  "Generate the string that was signed for the signature-header of the Clack HTTP request ENV.
+Will error our if the request’s Digest or Date headers don’t match our calculated values."
+  (let* ((headers      (getf env :headers))
+         (header-names (signed-header-names signature-alist)))
     (reduce
      (lambda (a b) (format nil "~A~%~A" a b))
      (mapcar
       (lambda (header-name)
-        (str:string-case (string-downcase header-name)
-          ;; (request-target) is a pseudo-header formatted like “post /inbox”.
-          ("(request-target)"
-           (format nil "~A: ~A ~A"
-                   header-name
-                   (string-downcase (symbol-name (getf env :request-method)))
-                   (getf env :path-info)))
-          ;; Calculate digest ourselves; never can’t trust the enemy!
-          ("digest"
-           (format nil "~A: SHA-256=~A" header-name (string-sha256sum (body-contents env))))
-          ;; … we can trust them on everything else, tho.
-          (otherwise
-           (format nil "~A: ~A" header-name (gethash header-name headers)))))
+        (let ((header-value (gethash header-name headers)))
+          (str:string-case (string-downcase header-name)
+            ;; (request-target) is a pseudo-header formatted like “post /inbox”.
+            ("(request-target)"
+             (format nil "~A: ~A ~A"
+                     header-name
+                     (string-downcase (symbol-name (getf env :request-method)))
+                     (getf env :path-info)))
+            ;; Calculate digest ourselves; never can’t trust the enemy!
+            ("digest"
+             (let ((our-digest
+                     (format nil "SHA-256=~A" (as/s:string-sha256sum (body-contents env)))))
+               (if (equal our-digest header-value)
+                   (format nil "~A: ~A" header-name our-digest)
+                   (signal 'invalid-signature-digest :digest header-value :our-digest our-digest))))
+            ;; They might be resending reqs, so ensure our clocks’re close enough.
+            ;; I reckon two hours is a good-enough margin of error.
+            ;; Or maybe I’m too lenient? ;P
+            ("date"
+             (let ((their-time (cl-date-time-parser:parse-date-time header-value)))
+               (if (< (abs (- current-time their-time))
+                      7200) ; Two hours in seconds
+                   (format nil "~A: ~A" header-name header-value)
+                   (signal 'invalid-signature-date :date their-time :our-date current-time))))
+            ;; … we can trust them on everything else, tho.
+            (otherwise
+             (format nil "~A: ~A" header-name header-value)))))
       header-names))))
 
 (defun signed-header-names (signature-alist)
   "Return a list of the names of headers used in a SIGNATURE-ALIST’s signed string."
   (str:split #\space (cdr (assoc :headers signature-alist)) :omit-nulls 't))
+
+(define-condition invalid-signature (condition)
+  ()
+  (:documentation "Thrown when validation of an HTTP signature fails."))
+
+(define-condition no-signature-header (invalid-signature)
+  ()
+  (:report (lambda (condition stream)
+             (format stream "No signature header was provided! 🐄~%Take a look at:
+https://swicg.github.io/activitypub-http-signature/#how-to-obtain-a-signature-s-public-key~&")))
+  (:documentation
+   "Thrown during HTTP signature-validation, when no signature header was provided at all."))
+
+(define-condition invalid-signature-date (invalid-signature)
+  ((date     :initarg :date     :initform nil)
+   (our-date :initarg :our-date :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "The given date “~A” is too far off from our own “~A”.~&"
+                     (slot-value condition 'date) (slot-value condition 'our-date))))
+  (:documentation
+   "Thrown during HTTP signature-validation, when the given Date header is too far in the past/future."))
+
+(define-condition invalid-signature-digest (invalid-signature)
+  ((digest     :initarg :digest     :initform nil)
+   (our-digest :initarg :our-digest :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "The digest header “~A” doesn’t match our calculated “~A”.~&"
+                     (slot-value condition 'digest) (slot-value condition 'our-digest))))
+  (:documentation
+   "Thrown during HTTP signature-validation, when the SHA256 digest header doesn’t match our calculated value."))
+
+(define-condition invalid-signature-algorithm (invalid-signature)
+  ((algorithm :initarg :algorithm :initform nil))
+  (:report (lambda (condition stream)
+             (format stream "The signature algorithm “~A” is invalid; we only support rsa-sha256.~&"
+                     (slot-value condition 'algorithm))))
+  (:documentation "Thrown during HTTP signature-validation, when the algorithm is unsupported."))
 
 
 
@@ -302,9 +379,15 @@ can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
   "If one tries to send an activity to our inbox, pass it along to
 the overloaded RECEIVE method."
   (let* ((contents (body-contents env)))
-    (receive (json-ld:parse contents))
-    '(200 (:content-type "text/plain") ("You win!"))))
-
+    (multiple-value-bind (signature-valid-p signature-error)
+        (signature-valid-p env)
+      (if (not signature-valid-p)
+          `(401 (:content-type "text/plain")
+                (,(if signature-error
+                      (princ-to-string signature-error)
+                      "Failed to verify signature. Heck! TvT")))
+          (and (receive (json-ld:parse contents))
+               '(200 (:content-type "text/plain") ("You win!")))))))
 
 
 
@@ -336,7 +419,7 @@ the overloaded RECEIVE method."
 
 (defun note-headers (inbox from to json)
   (let* ((inbox-uri (quri:uri inbox))
-         (digest-header (str:concat "SHA-256=" (string-sha256sum json)))
+         (digest-header (str:concat "SHA-256=" (as/s:string-sha256sum json)))
          (date-header
            (let ((local-time:*default-timezone* local-time:+gmt-zone+))
              (local-time:format-timestring

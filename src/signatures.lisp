@@ -51,6 +51,8 @@ It returns two values: The private key, then the public key."
 
 ;;; Signing & verification
 ;;; ————————————————————————————————————————
+(defmacro with-temporary-file (varspec &body body)) ; Stub, defined below.
+
 (defun sign-string (private-pem-string string)
   "RSA-SHA256 signs a STRING with a private key, returning a base64 string.
 Uses the host-system’s `base64`, `openssl`, & `printf` binaries."
@@ -69,6 +71,8 @@ Uses the host-system’s `openssl` & `printf` binaries."
       (let ((signature-usb8-array (base64:base64-string-to-usb8-array signature)))
         (with-temporary-file   (key-pathname "activityservist-" public-pem-string)
           (with-temporary-file (sig-pathname "activityservist-" signature-usb8-array)
+            ;; (inferior-shell:run/nil `(cp ,key-pathname /tmp/key.pem)) 
+            ;; (inferior-shell:run/nil `(cp ,sig-pathname /tmp/sig)) ; Useful for debugging
             (inferior-shell:run/lines
              `(inferior-shell:pipe
                (printf ,string)
