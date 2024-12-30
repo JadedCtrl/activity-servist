@@ -20,7 +20,7 @@
   (:nicknames "AS/V/LP" "LITEPUB")
   (:export
    ;; Classes
-   :activity :note :object :update
+   :activity :note :object :person :update
    :chat-message :emoji :emoji-react :hashtag :property-value
    ;; Slots/Accessors
    :also-known-as :atom-uri :capabilities :conversation :direct-message-p
