@@ -393,11 +393,20 @@ JSON-type that best suits the object — using the types registered into
         if (eq class-name (caar registry))
           return iri))
 
+(defun superclass-json-type-name (class-name)
+  "Return the name (IRI) of a registered JSON-type from the name of its CLOS class
+or any inheriting thereof."
+  (let ((class (find-class class-name)))
+    (closer-mop:finalize-inheritance class)
+    (dolist (superclass (closer-mop:class-precedence-list class))
+      (let ((name (class-json-type-name (class-name superclass))))
+        (if name (return name))))))
+
 (defun class-json-type-definition (class-name)
   "Return the type-definition from the the registry of JSON types (*JSON-TYPES*),
 based on a CLOS class-name. It is of the form,
   ((CLASS-NAME TYPE-NAME) (SLOT-NAME PROPERTY-NAME) ⋯ (SLOT-NAME PROPERTY-NAME))"
-  (gethash (class-json-type-name class-name) *json-types*))
+    (gethash (superclass-json-type-name class-name) *json-types*))
 
 
 

@@ -54,7 +54,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :depends-on (:alexandria :dexador :str :yason)
+  :depends-on (:alexandria :closer-mop :dexador :str :yason)
   :components ((:file "src/json-ld")))
 
 
