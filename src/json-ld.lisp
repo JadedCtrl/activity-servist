@@ -108,25 +108,39 @@ If you would like to change it on an object-level, set the @CONTEXT slot."))
   (flatten-contained-contexts obj)
   ;; We only want to encode @context, @id, and @type if the child class doesn’t
   ;; have its own alias for them.
-  (flet ((aliased-prop-p (property-name type-def)
-           (not (equal property-name
-                       (cddr (assoc property-name type-def :test #'equal))))))
-    (let* ((class-name   (class-name (class-of obj)))
-           (type-def     (cdr (class-json-type-definition class-name)))
-           ;; (@context is a special case; we should usually encode it.)
-           (no-context-p (and (aliased-prop-p "@context" type-def)
-                              (slot-value obj '@context)))
-           (no-id-p      (aliased-prop-p "@id" type-def))
-           (no-type-p    (aliased-prop-p "@type" type-def))
-           (context      (@context obj))
-           (id           (and (slot-boundp obj '@id)   (@id obj)))
-           (type         (and (slot-boundp obj '@type) (@type obj))))
-      (when (and context (not no-context-p))
-        (yason:encode-object-element "@context" context))
-      (when (and id (not no-id-p))
-        (yason:encode-object-element "@id"      id))
-      (when (and type (not no-type-p))
-        (yason:encode-object-element "@type"    type))))
+  (labels ((property-alias (property-name type-def)
+             "Return either PROPERTY-NAME or its alias. I.E., “@type” → “type”."
+             (cddr (assoc property-name type-def :test #'equal)))
+           (aliased-prop-p (property-name type-def)
+             "Return whether or not PROPERTY-NAME is aliased."
+             (not (equal property-name
+                         (property-alias property-name type-def)))))
+    (let* ((class-name      (class-name (class-of obj)))
+           (type-def-w-name (class-json-type-definition class-name))
+           (type-def        (cdr type-def-w-name))
+           (don’t-context-p (and (aliased-prop-p "@context" type-def)
+                                 (slot-value obj '@context)))
+           (object-context  (@context obj))
+           (object-id       (and (slot-boundp obj '@id)   (@id obj)))
+           (object-type     (and (slot-boundp obj '@type) (@type obj)))
+           (class-type      (cdar type-def-w-name)))
+      ;; Encode @CONTEXT unless it’s done by DEFINE-JSON-TYPE-ENCODER’s encoder,
+      ;; which only happens when “@context” is aliased & set at the object-level
+      ;; (that is, the slot’s set and we don’t defer to the class).
+      (when (and object-context (not don’t-context-p))
+        (yason:encode-object-element "@context" object-context))
+      ;; Encode @ID unless it’s done by DEFINE-JSON-TYPE-ENCODER’s encoder,
+      ;; which is in the case of an alias.
+      (when (and object-id (not (aliased-prop-p "@id" type-def)))
+        (yason:encode-object-element "@id" object-id))
+      ;; Encode @TYPE unless it’s done by DEFINE-JSON-TYPE-ENCODER’s encoder,
+      ;; which only happens when “@type” is aliased & set at the object-level.
+      (cond ((and object-type   (not (aliased-prop-p "@type" type-def)))
+             (yason:encode-object-element "@type"    object-type))
+            ((and class-type    (not object-type))
+             (yason:encode-object-element (property-alias "@type" type-def)
+                                          class-type)))))
+  ;; Now encode all properties that don’t have dedicated slots, those in @ETC.
   (mapcar (lambda (alist-cell)
             (yason:encode-object-element (car alist-cell)
                                          (cdr alist-cell)))
@@ -224,11 +238,10 @@ applying default slot-options, etc."
 (defun json-type-normalize-slot-options (slot-opts)
   "Take property-list slot options from a DEFINE-JSON-TYPE format and massage it
 into a DEFCLASS format."
-  (let* ((sans-accessor-maybe (if (and (find :accessor slot-opts)
-                                       (not (getf slot-opts :accessor)))
-                                  (alexandria:remove-from-plist slot-opts :accessor)
-                                  slot-opts)))
-    sans-accessor-maybe))
+  (if (and (find :accessor slot-opts)
+           (not (getf slot-opts :accessor)))
+      (alexandria:remove-from-plist slot-opts :accessor)
+      slot-opts))
 
 
 
