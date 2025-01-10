@@ -143,7 +143,7 @@ Returns the object if it was retrieved or fetched; nil otherwise."
 
 ;;; Signature HTTP-header parsing
 ;;; ————————————————————————————————————————
-(defun signature-valid-p (env &key (current-time (get-universal-time)))
+(defun signature-valid-p (env activity &key (current-time (get-universal-time)))
   "Return whether or not the Clack HTTP-request ENV’s signature is valid.
 Only RSA-SHA256 signatures are supported.
 Might provide a condition detailing the reason of the signature’s invalidity as
@@ -161,12 +161,35 @@ https://swicg.github.io/activitypub-http-signature/"
              (signed-str       (signed-string env signature-alist :current-time current-time)))
         (when (and algorithm (not (string-equal (cdr algorithm) "rsa-sha256")))
           (signal 'invalid-signature-algorithm :algorithm (cdr algorithm)))
+        (when (not (matching-domains-p signature-alist activity))
+          (signal 'invalid-signature-domain-mismatch))
         (list
          (gethash "https://w3id.org/security#publicKeyPem" (signature-key signature-alist))
          signed-str
          (cdr (assoc :signature signature-alist))))
     (invalid-signature (err)
       (values nil err))))
+
+(defun matching-domains-p (signature-alist activity)
+  "Returns whether or not the domain names within an ACTIVITY match, for ensuring
+its signature is applicable: Those of the signature key’s, the actor’s @ID,
+and the ACTIVITY’s @ID.
+If these all match the same domain, and the signature is valid, we can safely say
+the ACTIVITY did indeed come from that domain."
+  (labels ((uri-string (slot-value)
+             (typecase slot-value
+               (string slot-value)
+               (json-ld:object
+                (json-ld:@id slot-value))))
+           (domain-name (slot-value)
+             (let ((uri-string (uri-string slot-value)))
+               (when uri-string
+                 (quri:uri-domain (quri:uri uri-string))))))
+    (equal*
+      (remove-if #'not
+       (list (domain-name activity)
+             (domain-name (as/v/a:actor activity))
+             (domain-name (assoc :keyid signature-alist)))))))
 
 (defun signature-header-parse (signature-header)
   "Parses the signature header into an associative list of the form:
@@ -266,6 +289,13 @@ https://swicg.github.io/activitypub-http-signature/#how-to-obtain-a-signature-s-
              (format stream "The signature algorithm “~A” is invalid; we only support rsa-sha256.~&"
                      (slot-value condition 'algorithm))))
   (:documentation "Thrown during HTTP signature-validation, when the algorithm is unsupported."))
+
+(define-condition invalid-signature-domain-mismatch (invalid-signature)
+  ()
+  (:report (lambda (condition stream)
+             (format stream "There is a domain-name mismatch within the activity, and so we can’t say for sure the signature is valid.~%
+Check the ID domain-names of the actor, the activity, and the signature-key.~&")))
+  (:documentation "Thrown during HTTP signature-validation, when it's noticed that domains-names for ID URIs don't match."))
 
 
 
@@ -382,13 +412,14 @@ can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
 (defun http-inbox (env path-items params)
   "If one tries to send an activity to our inbox, pass it along to
 the overloaded RECEIVE method."
-  (let* ((contents (body-contents env)))
+  (let* ((contents      (body-contents env))
+         (json-contents (json-ld:parse contents)))
     (multiple-value-bind (signature-valid-p signature-error)
-        (signature-valid-p env)
+        (signature-valid-p env json-contents)
       (cond (signature-error (signal signature-error))
             ((not signature-valid-p)
              (signal 'http-result :status 401 :message "Failed to verify signature. Heck! TvT"))
-            ((receive (json-ld:parse contents))
+            ((receive json-contents)
              '(200 (:content-type "text/plain") ("You win!")))))))
 
 
@@ -568,3 +599,7 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
           (loop for number across
                 sequence
                 collect (format nil "~X" number))))
+(defun equal* (&rest items)
+  "Whether or not all ITEMS are EQUAL to one another."
+  (loop for item in items
+        always (equal item (car items))))
