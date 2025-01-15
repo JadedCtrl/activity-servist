@@ -1,6 +1,6 @@
 ;;;; litepub: Common ActivityPub JSON-types, borrowed from Pleroma
 
-;; Copyright © 2024 Jaidyn Ann <jadedctrl@posteo.at>
+;; Copyright © 2024-2025 Jaidyn Ann <jadedctrl@posteo.at>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -18,6 +18,7 @@
 (defpackage #:activity-servist/vocab/litepub
   (:use #:cl)
   (:nicknames "AS/V/LP" "LITEPUB")
+  (:shadow #:block #:delete #:first #:ignore #:last #:listen #:read #:remove)
   (:export
    ;; Classes
    :activity :note :object :person :update
@@ -55,6 +56,38 @@ Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD c
   "List of slots added to subclasses corresponding AS/VOCAB/ACTIVITY classes.
 For example, slots in our OBJECT that aren’t in AS/V/A:OBJECT.
 Used by our overloaded JSON-LD:@CONTEXT to help choose the appropriate JSON-LD context.")
+
+
+
+;;; Macros
+;;; ————————————————————————————————————————
+;; TODO: We really shouldn’t have to specify DIRECT-CHILDREN manually, and we
+;; could do some MOP magic. That’s not pressing at the moment, though!
+(defmacro define-json-empty-replacements (superclasses context &rest direct-children)
+  "For each list of DIRECT-CHILDREN, each describing an existant JSON-type’s class,
+a “replacment” JSON type and class will be defined. The replacement class will have
+the same name as the old class, but as a new symbol within the current package.
+The replacement class will also have the replacee as its superclass, in addition to
+classes listed in SUPERCLASSES.
+
+This is particularly useful for effectively “inserting” your own version of a
+core ActivityPub type into the class hierarchy.
+
+Items of DIRECT-CHILDREN should be of the form,
+   (OLD-CLASS-SYMBOL “typeName” “Documenation-string describing the subclass.”)"
+  (append
+   '(progn)
+   (mapcar (lambda (subclass-list)
+             (let* ((old-class-sym  (cl:first subclass-list))
+                    (new-class-sym  (intern (symbol-name old-class-sym)))
+                    (new-superclasses (append (list old-class-sym) superclasses))
+                    (type-name      (second   subclass-list))
+                    (documentation  (third    subclass-list)))
+               `(json-ld:define-json-type (,new-class-sym ,type-name) ,new-superclasses ,context
+                  ()
+                  (:documentation ,documentation))))
+           direct-children)))
+
 
 
 ;;; Core types
@@ -146,6 +179,32 @@ Potentially deprecated/very uncommon.")
 
 ;;; Extended Activity types
 ;;; ————————————————————————————————————————
+(define-json-empty-replacements (activity) *litepub-uri*
+  (as/v/a:accept   "Accept"   "Indicates that the actor accepts the object. The target property can be used in certain circumstances to indicate the context into which the object has been accepted.")
+  (as/v/a:add      "Add"    "Indicates that the actor has added the object to the target. If the target property is not explicitly specified, the target would need to be determined implicitly by context. The origin can be used to identify the context from which the object originated.")
+  (as/v/a:create   "Create"   "Indicates that the actor has created the object.")
+  (as/v/a:delete   "Delete"   "Indicates that the actor has deleted the object. If specified, the origin indicates the context from which the object was deleted.")
+  (as/v/a:follow   "Follow"   "Indicates that the actor is “following” the object. Following is defined in the sense typically used within Social systems in which the actor is interested in any activity performed by or on the object. The target and origin typically have no defined meaning.")
+  (as/v/a:ignore   "Ignore"   "Indicates that the actor is ignoring the object. The target and origin typically have no defined meaning.")
+  (as/v/a:join     "Join"     "Indicates that the actor has joined the object. The target and origin typically have no defined meaning.")
+  (as/v/a:leave    "Leave"    "Indicates that the actor has left the object. The target and origin typically have no meaning.")
+  (as/v/a:like     "Like"     "Indicates that the actor likes, recommends or endorses the object. The target and origin typically have no defined meaning.")
+  (as/v/a:offer    "Offer"    "Indicates that the actor is offering the object. If specified, the target indicates the entity to which the object is being offered.")
+  (as/v/a:reject   "Reject"   "Indicates that the actor is rejecting the object. The target and origin typically have no defined meaning.")
+  (as/v/a:remove   "Remove"   "Indicates that the actor is removing the object. If specified, the origin indicates the context from which the object is being removed.")
+  (as/v/a:undo     "Undo"     "Indicates that the actor is undoing the object. In most cases, the object will be an Activity describing some previously performed action (for instance, a person may have previously “liked” an article but, for whatever reason, might choose to undo that like at some later point in time).
+The target and origin typically have no defined meaning.")
+  (as/v/a:view     "View"     "Indicates that the actor has viewed the object.")
+  (as/v/a:listen   "Listen"   "Indicates that the actor has listened to the object.")
+  (as/v/a:read     "Read"     "Indicates that the actor has read the object.")
+  (as/v/a:move     "Move"     "Indicates that the actor has moved object from origin to target. If the origin or target are not specified, either can be determined by context.")
+  (as/v/a:travel   "Travel"   "Indicates that the actor is traveling to target from origin. Travel is an IntransitiveObject whose actor specifies the direct object. If the target or origin are not specified, either can be determined by context.")
+  (as/v/a:announce "Announce" "Indicates that the actor is calling the target's attention the object.
+The origin typically has no defined meaning.")
+  (as/v/a:flag     "Flag"     "Indicates that the actor is “flagging” the object. Flagging is defined in the sense common to many social platforms as reporting content as being inappropriate for any number of reasons.")
+  (as/v/a:dislike  "Dislike"  "Indicates that the actor dislikes the object."))
+
+
 (json-ld:define-json-type (update "Update") (as/v/a:update activity) *litepub-uri*
   (;; https://ostatus.github.io/spec/OStatus%201.0%20Draft%202.html#rfc.section.6
    (conversation
