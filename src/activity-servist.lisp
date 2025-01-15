@@ -174,8 +174,27 @@ https://swicg.github.io/activitypub-http-signature/"
          (gethash "https://w3id.org/security#publicKeyPem" (signature-key signature-alist))
          signed-str
          (cdr (assoc :signature signature-alist))))
+    ;; The special case of an actor being deleted, and so their key inaccessible.
+    ;; https://swicg.github.io/activitypub-http-signature/#handling-deletes-of-actors
+    (fetch-error (err)
+      (or (deleting-object-p)
+          (signal 'invalid-signature-failed-fetch)))
+    ;; The very normal case of the signature simply being invalid! :P
     (invalid-signature (err)
       (values nil err))))
+
+(defun deleting-object-p (activity)
+  "Whether or not ACTIVITY is a DELETE and the OBJECT of the ACTIVITY — purportedly,
+what would be deleted — is actually deleted. Fetching the object must, in which
+case, return a 404 or a 410 HTTP error."
+  (when (typep activity 'as/v/a:delete)
+    (handler-case
+        (progn (as/u:http-get (as/v/a:object activity))
+               nil)
+      (as/u:http-get-error (err)
+        (let ((status (slot-value err 'as/u:status)))
+          (member status '(404 410)))))))
+
 
 (defun matching-domains-p (signature-alist activity)
   "Returns whether or not the domain names within an ACTIVITY match, for ensuring
@@ -303,6 +322,12 @@ https://swicg.github.io/activitypub-http-signature/#how-to-obtain-a-signature-s-
              (format stream "There is a domain-name mismatch within the activity, and so we can’t say for sure the signature is valid.~%
 Check the ID domain-names of the actor, the activity, and the signature-key.~&")))
   (:documentation "Thrown during HTTP signature-validation, when it's noticed that domains-names for ID URIs don't match."))
+
+(define-condition invalid-signature-failed-fetch (invalid-signature)
+  ()
+  (:report (lambda (condition stream) (declare (ignore condition))
+             (format stream "We were unable to fetch the signature’s public key. Either the server is napping, or the given key’s address is a lie. We are agnostic.")))
+  (:documentation "Thrown during HTTP signature-validation, when the signature’s public key couldn’t be downloaded; and we have no cached version of it, either. And so, it is currently impossible to validate/invalidate the signature. We are agnostic."))
 
 
 
