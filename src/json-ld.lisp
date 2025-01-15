@@ -1,6 +1,6 @@
 ;;;; json-λd: (Aspiring) parser and encoder for JSON-LD data
 
-;; Copyright © 2024 Jaidyn Ann <jadedctrl@posteo.at>
+;; Copyright © 2024-2025 Jaidyn Ann <jadedctrl@posteo.at>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU Affero General Public License
@@ -455,8 +455,7 @@ yet been parsed into CTX."
 (defun parse-remote-context (ctx uri)
   "Parse a remote JSON-LD context at URI, adding its terms to the CTX
 hash-table."
-  (let* ((headers '(("Accept" . "application/json,application/ld+json")))
-         (str     (caching-http-get uri :headers headers))
+  (let* ((str     (caching-http-get uri))
          (parsed  (yason:parse str)))
     (parse-context (gethash "@context" parsed) ctx)))
 
@@ -641,7 +640,7 @@ defined in the context."))
 
 ;;; Utility
 ;;; ————————————————————————————————————————
-(defun caching-http-get (uri &key headers)
+(defun caching-http-get (uri &key (accept "application/json,application/ld+json"))
   "Makes a GET request to URI, returning the resultant string.
 Each resultant string is cached in the *HTTP-CACHE* global variable; if the same
 URI is requested more than once, the cached version will subsequently be
@@ -656,7 +655,7 @@ the directories *HTTP-CACHE-DIRS*, its contents will be returned instead."
               (when cached-filepath
                 (alexandria:read-file-into-string cached-filepath))))
       (setf (gethash uri *http-cache*) ; If not cached, download & cache it.
-            (http-get uri :headers headers))))
+            (as/u:http-get uri :accept accept))))
 
 (defun find-file (file-leaf dirs)
   "Search for a file of the given name FILE-LEAF within directories DIRS.
@@ -666,10 +665,6 @@ Returns the first found matching file."
                     (equal a (file-namestring b))))
       (unless (not (cdr dirs))
         (get-file-from-dirs file-leaf (cdr dirs)))))
-
-(defun http-get (uri &key headers)
-  "Makes a GET request to URI, returning the resultant string."
-  (dexador:get uri :headers headers :force-string 't))
 
 (defun uri-sans-scheme (uri)
   "Returns a URI string without its scheme."

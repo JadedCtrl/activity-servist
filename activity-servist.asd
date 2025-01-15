@@ -10,8 +10,9 @@
 
   :in-order-to ((test-op (test-op "activitypub/tests")))
   :depends-on (:activity-servist/vocab/activity :activity-servist/signatures
-               :alexandria :clack :cl-date-time-parser :dexador :local-time
-               :purl :str :webtentacle :yason)
+               :activity-servist/util
+               :alexandria :clack :cl-date-time-parser :local-time :purl
+               :str :webtentacle :yason)
   :components ((:file "src/activity-servist")))
 
 
@@ -54,7 +55,8 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :depends-on (:alexandria :closer-mop :dexador :str :yason)
+  :depends-on (:activity-servist/util
+               :alexandria :closer-mop :quri :str :yason)
   :components ((:file "src/json-ld")))
 
 
@@ -68,6 +70,16 @@
   :depends-on (:cl-base64 :flexi-streams :inferior-shell :ironclad :osicat)
   :components ((:file "src/signatures")))
 
+
+(asdf:defsystem "activity-servist/util"
+  :version "0.0"
+  :license "AGPLv3"
+  :description "A-S subpackage for utility functions."
+  :author "Jaidyn Ann <jadedctrl@posteo.at>"
+  :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
+
+  :depends-on (:drakma :flexi-streams)
+  :components ((:file "src/util")))
 
 
 ;;; Tests

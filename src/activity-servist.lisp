@@ -1,6 +1,6 @@
 ;;;; activity-servist: An ActivityPub server framework.
 
-;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
+;; Copyright © 2023-2025 Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU Affero General Public License
@@ -118,10 +118,13 @@ this is solely used to store fetched foreign objects."))
 ;;    — The Mountain Goats, “Foreign Object” (2015)
 
 (defun fetch (obj-uri)
-  "Fetch & parse an ActivityPub object from a foreign server; returning the object"
-  (let ((json
-          (dexador:get obj-uri :headers '(("Accept" . "application/activity+json")))))
-    (json-ld:parse json)))
+  "Fetch & parse an ActivityPub object from a foreign server; returning the object.
+Will throw a FETCH-ERROR if the HTTP request fails."
+  (handler-case
+      (json-ld:parse (as/u:http-get obj-uri))
+    (as/u:http-get-error (err)
+      (error 'fetch-error :status (slot-value err 'as/u:status)
+                          :body   (slot-value err 'as/u:body)))))
 
 (defun fetch-and-store (obj-uri)
   "Fetch & parses an ActivityPub object from a foreign server; then try to pass it
@@ -139,6 +142,10 @@ Returns the object if it was retrieved or fetched; nil otherwise."
   (or (retrieve obj-uri)
       (fetch-and-store obj-uri)))
 
+(define-condition fetch-error (error)
+  ((status  :initarg :status)
+   (body    :initarg :body))
+  (:documentation "Thrown when we fail to fetch a resource, and get a non-2XX HTTP status code."))
 
 
 ;;; Signature HTTP-header parsing
@@ -481,8 +488,7 @@ the overloaded RECEIVE method."
 (defun send-note (inbox from to text)
   (let* ((json (note-json from to text))
          (headers (note-headers inbox from to json)))
-    (dexador:post inbox :content json
-                        :headers headers)))
+    nil))
 
 
 
