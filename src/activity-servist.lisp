@@ -49,7 +49,8 @@ There is one required property:
 
 :RETRIEVE should be a function of (RETRIEVE URI)
 This function should simply return an object from your storage, queried by a URI.
-The URI parameter is going to be either an @ID or an account-URI of the form “acct:username@hostname”.")
+The URI parameter is going to be either an @ID or an account-URI of the form
+“acct:username@hostname”.")
 
 (defvar       *logs*  nil "A list of incoming Clack HTTP requests, used for debugging.")
 (defparameter *debug* nil "Whether or not debugging-mode is on. More verbose errors, detailed logging, etc.")
@@ -60,13 +61,6 @@ The URI parameter is going to be either an @ID or an account-URI of the form “
     (".well-known/host-meta" . http-host-meta)
     ("inbox"                 . http-inbox)
     (""                      . http-object)))  ; By default, assume object.
-
-(defvar *privkey*
-  (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :activity-servist #p"enc/privkey.pem")))
-(defvar *pubkey*
-  (alexandria:read-file-into-string
-   (asdf:system-relative-pathname :activity-servist #p"enc/pubkey.pem")))
 
 
 
@@ -285,7 +279,7 @@ Will error our if the request’s Digest or Date headers don’t match our calcu
 
 (define-condition no-signature-header (invalid-signature)
   ()
-  (:report (lambda (condition stream)
+  (:report (lambda (condition stream) (declare (ignore condition))
              (format stream "No signature header was provided! 🐄~%Take a look at:
 https://swicg.github.io/activitypub-http-signature/#how-to-obtain-a-signature-s-public-key~&")))
   (:documentation
@@ -318,7 +312,7 @@ https://swicg.github.io/activitypub-http-signature/#how-to-obtain-a-signature-s-
 
 (define-condition invalid-signature-domain-mismatch (invalid-signature)
   ()
-  (:report (lambda (condition stream)
+  (:report (lambda (condition stream) (declare (ignore condition))
              (format stream "There is a domain-name mismatch within the activity, and so we can’t say for sure the signature is valid.~%
 Check the ID domain-names of the actor, the activity, and the signature-key.~&")))
   (:documentation "Thrown during HTTP signature-validation, when it's noticed that domains-names for ID URIs don't match."))
@@ -345,7 +339,6 @@ Public keys are hash-tables, which should look more-or-less like so:
   (actor-key-of-id (signature-key-owner signature-alist)
                    (cdr (assoc :keyid signature-alist))))
 
-
 (defun signature-key-owner (signature-alist)
   "Return a the owning actor (likely as a LITEPUB:PERSON) of the public key
 corresponding to the given SIGNATURE-ALIST (of SIGNATURE-HEADER-PARSE's format)."
@@ -360,7 +353,6 @@ corresponding to the given SIGNATURE-ALIST (of SIGNATURE-HEADER-PARSE's format).
        (retrieve-or-fetch (gethash "https://w3id.org/security#owner" result)))
       (litepub:person
        data))))
-
 
 (defun actor-key-of-id (actor id)
   "Search through an ActivityPub ACTOR’s public keys, returning the one
@@ -625,11 +617,6 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
 “/u/bear/apple.txt” → '(“u” “bear” “apple.txt”)"
   (str:split #\/ pathname :omit-nulls 't))
 
-(defun sequence-hexadecimal-string (sequence)
-  (reduce #'str:concat
-          (loop for number across
-                sequence
-                collect (format nil "~X" number))))
 (defun equal* (&rest items)
   "Whether or not all ITEMS are EQUAL to one another."
   (loop for item in items

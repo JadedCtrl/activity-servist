@@ -1,6 +1,6 @@
 ;;;; activity-vocabulary: Base vocabulary classes for ActivityStreams.
 
-;; Copyright © 2024 Jaidyn Ann <jadedctrl@posteo.at>
+;; Copyright © 2024-2025 Jaidyn Ann <jadedctrl@posteo.at>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -46,7 +46,7 @@
 
 (defmacro define-json-empty-types (superclasses context &rest direct-children)
   "For each list of DIRECT-CHILDREN, a “hollow” JSON subtype and CLOS subclass
-ofE SUPERCLASSES will be created, with the given JSON-LD context @CONTEXT.
+of SUPERCLASSES will be created, with the given JSON-LD context @CONTEXT.
 These new subclasses have no slots of its own — they will be empty derivatives
 of SUPERCLASSES.
 
