@@ -94,43 +94,43 @@ Items of DIRECT-CHILDREN should be of the form,
 ;;; ————————————————————————————————————————
 (json-ld:define-json-type (object "Object") (as/v/a:object) *litepub-uri*
   ((atom-uri
-    "atomUri"
+    "atomUri" :initarg atom-uri
     :documentation "A string containing a URI to an Atom-feed alternative representation of an object.
 Potentially deprecated/very uncommon.")
    ;; https://docs.joinmastodon.org/spec/activitypub/#sensitive
    (sensitivep
-    "sensitive"
+    "sensitive" :initarg :sensitivep
     :documentation "A boolean value, representing whether or not an Object’s content is not necessarily generally appropriate. This will often hide the content, to some clients. SUMMARY will often be displayed in place of the content.")
    (non-anonymous
-    "nonAnonymous"
+    "nonAnonymous" :initarg :non-anonymous
     :documentation "I had no luck finding what this might mean, to be honest. ¯\_(ツ)_/¯
 Likely deprecated/highly uncommon.")
    (direct-message-p
-    "directMessage"
+    "directMessage" :initarg :direct-message-p
     :documentation "A boolean value commonly used to mark a Note as non-public, a direct message to be visible only to those in TO.
 Seemingly may be set in the Activity modifying the Note, or the Note itself.")
    (former-representations
-    "formerRepresentations")
+    "formerRepresentations" :initarg :former-representations)
 
    ;; Actor properties
    (public-key
-    "publicKey"
+    "publicKey" :initarg :public-key
     :documentation "Contains an object representing a definition of the Actor’s public key, used for HTTP signatures.
 Generally contains the properties “id”, “owner”, “publicKeyPem”.")
    ;; https://docs.joinmastodon.org/spec/activitypub/#discoverable
    (discoverablep
-    "discoverable"
+    "discoverable" :initarg :discoverablep
     :documentation "A boolean value reflecting whether or not an Actor’s profile should be publically discoverable.")
    ;; https://docs.joinmastodon.org/spec/activitypub/#as
    (manually-approves-followers-p
-    "manuallyApprovesFollowers"
+    "manuallyApprovesFollowers" :initarg :manually-approves-followers-p
     :documentation "A boolean value, communicating whether or not an Actor screens follow-requests.")
    ;; https://docs.joinmastodon.org/spec/activitypub/#Move
    (also-known-as
-    "alsoKnownAs"
+    "alsoKnownAs" :initarg :also-known-as
     :documentation "When moving between two accounts, the old account sets this property to the URI of the new account.")
    (capabilities
-    "capabilities"
+    "capabilities" :initarg :capabilities
     :documentation "Contains a hash-table of capability-names mapped to a boolean, marking this Actor’s (server’s) support of capability.
 One known capabilitity-name is Pleroma’s “acceptsChatMessages”.")))
 
@@ -157,11 +157,11 @@ One known capabilitity-name is Pleroma’s “acceptsChatMessages”.")))
 (json-ld:define-json-type (activity "Activity") (as/v/a:activity object) *litepub-uri*
   (;; https://blog.dereferenced.org/leveraging-json-ld-compound-typing-for-behavioural-hinting-in-activitypub
    (invisiblep
-    "invisible"
+    "invisible" :initarg :invisiblep
     :documentation "A boolean value hinting as to whether or not the result of an Activity should be invisible to the end-user.
 Potentially deprecated/very uncommon.")
    (list-message
-    "list-message"))
+    "list-message" :initarg :list-message))
   (:documentation "An Activity is a subtype of Object that describes some form of action that may happen, is currently happening, or has already happened. The Activity type itself serves as an abstract base type for all types of activities. It is important to note that the Activity type itself does not carry any specific semantics about the kind of action being taken."))
 
 
@@ -170,7 +170,7 @@ Potentially deprecated/very uncommon.")
     (litepub:object json-ld:object) *litepub-uri*
   (;; https://schema.org/value
    (value
-    "value"
+    "value" :initarg :value
     :documentation "The value of a property value node."))
   (:documentation
    "Commonly used to store custom metadata on a Person, stored in its ATTACHMENT slot."))
@@ -208,7 +208,7 @@ The origin typically has no defined meaning.")
 (json-ld:define-json-type (update "Update") (as/v/a:update activity) *litepub-uri*
   (;; https://ostatus.github.io/spec/OStatus%201.0%20Draft%202.html#rfc.section.6
    (conversation
-    "conversation"
+    "conversation" :initarg :conversation
     :documentation "When an update is part of a distributed conversation, this is the URI of that conversation.
 Likely deprecated/highly uncommon."))
   (:documentation "Indicates that the actor has updated the object. Note, however, that this vocabulary does not define a mechanism for describing the actual set of modifications made to object.
@@ -233,7 +233,7 @@ The target and origin typically have no defined meaning."))
 (json-ld:define-json-type (note "Note") (as/v/a:note object) *litepub-uri*
   (;; https://misskey-hub.net/ns#_misskey_quote
    (quote-url
-    "quoteUrl"
+    "quoteUrl" :initarg :quote-url
     :accessor nil
     :documentation "Signifies that this Note is “quoting” another Note. Its value is another Note’s ID.
 Effectively equivalent to QUOTE-URI.
@@ -241,7 +241,7 @@ One of QUOTE-URL (as:quoteUrl) or QUOTE-URI (fedibird:quoteUri) is to be depreca
 It is, however, unclear which one will win out in the end. The implementer prefers QUOTE-URL.")
    ;; https://misskey-hub.net/ns#_misskey_quote
    (quote-uri
-    "quoteUri"
+    "quoteUri" :initarg :quote-uri
     :accessor nil
     :documentation "Signifies that this Note is “quoting” another Note. Its value is another Note’s ID.
 Effectively equivalent to QUOTE-URL.

@@ -71,118 +71,118 @@ Items of DIRECT-CHILDREN should be of the form,
 ;; The root of all evil in the world.
 (json-ld::define-json-type (object "Object") () "https://www.w3.org/ns/activitystreams"
   ((json-ld:@id
-    "id"
+    "id" :initarg :@id
     :documentation "Provides the globally unique identifier for an Object.")
    (json-ld:@type
-    "type"
+    "type" :initarg :@type
     :documentation "Identifies the Object type. Multiple values may be specified.")
    (attachment
-    "attachment"
+    "attachment" :initarg :attachment
     :documentation "Identifies a resource attached or related to an object that potentially requires special handling. The intent is to provide a model that is at least semantically similar to attachments in email.")
    (attributed-to
-    "attributedTo"
+    "attributedTo" :initarg :attributed-to
     :documentation "Identifies one or more entities to which this object is attributed. The attributed entities might not be Actors. For instance, an object might be attributed to the completion of another activity.")
    (audience
-    "audience"
+    "audience" :initarg :audience
     :documentation "Identifies one or more entities that represent the total population of entities for which the object can considered to be relevant.")
    (content
-    "content"
+    "content" :initarg :content
     :documentation "The content or textual representation of the Object encoded as a JSON string. By default, the value of content is HTML. The media-type property can be used in the object to indicate a different content type.
 The content MAY be expressed using multiple language-tagged values. ")
    (context
-    "context"
+    "context" :initarg :context
     :documentation "Identifies the context within which the object exists or an activity was performed.
 The notion of “context” used is intentionally vague. The intended function is to serve as a means of grouping objects and activities that share a common originating context or purpose. An example could be all activities relating to a common project or event.")
    (name
-    "name"
+    "name" :initarg :name
     :documentation "A simple, human-readable, plain-text name for the object. HTML markup MUST NOT be included. The name MAY be expressed using multiple language-tagged values.")
    (end-time
-    "endTime"
+    "endTime" :initarg :end-time
     :documentation "The date and time describing the actual or expected ending time of the object. When used with an Activity object, for instance, the end-time property specifies the moment the activity concluded or is expected to conclude.")
    (generator
-    "generator"
+    "generator" :initarg :generator
     :documentation "Identifies the entity (e.g. an application) that generated the object.")
    (icon
-    "icon"
+    "icon" :initarg :icon
     :documentation "Indicates an entity that describes an icon for this object. The image should have an aspect ratio of one (horizontal) to one (vertical) and should be suitable for presentation at a small size.")
    (image
-    "image"
+    "image" :initarg :image
     :documentation "Indicates an entity that describes an image for this object. Unlike the icon property, there are no aspect ratio or display size limitations assumed.")
    (in-reply-to
-    "inReplyTo"
+    "inReplyTo" :initarg :in-reply-to
     :documentation "Indicates one or more entities for which this object is considered a response.")
    (location
-    "location"
+    "location" :initarg :location
     :documentation "Indicates one or more physical or logical locations associated with the object.")
    (preview
-    "preview"
+    "preview" :initarg :preview
     :documentation "Identifies an entity that provides a preview of this object.")
    (published
-    "published"
+    "published" :initarg :published
     :documentation "The date and time describing the actual or expected starting time of the object. When used with an Activity object, for instance, the start-time property specifies the moment the activity began or is scheduled to begin.")
    (replies
-    "replies"
+    "replies" :initarg :replies
     :documentation "Identifies a Collection containing objects considered to be responses to this object.")
    (start-time
-    "startTime"
+    "startTime" :initarg :start-time
     :documentation "The date and time describing the actual or expected starting time of the object. When used with an Activity object, for instance, the start-time property specifies the moment the activity began or is scheduled to begin.")
    (summary
-    "summary"
+    "summary" :initarg :summary
     :documentation "A natural language summarization of the object encoded as HTML. Multiple language tagged summaries MAY be provided.")
    (tag
-    "tag"
+    "tag" :initarg :tag
     :documentation "One or more “tags” that have been associated with an objects. A tag can be any kind of Object. The key difference between attachment and tag is that the former implies association by inclusion, while the latter implies associated by reference.")
    (updated
-    "updated"
+    "updated" :initarg :updated
     :documentation "The date and time at which the object was updated.")
    (url
-    "url"
+    "url" :initarg :url
     :documentation "Identifies one or more links to representations of the object.")
    (to
-    "to"
+    "to" :initarg :to
     :documentation "Identifies an entity considered to be part of the public primary audience of an Object.")
    (bto
-    "bto"
+    "bto" :initarg :bto
     :documentation "Identifies an Object that is part of the private primary audience of this Object.")
    (cc
-    "cc"
+    "cc" :initarg :cc
     :documentation "Identifies an Object that is part of the public secondary audience of this Object.")
    (bcc
-    "bcc"
+    "bcc" :initarg :bcc
     :documentation "Identifies one or more Objects that are part of the private secondary audience of this Object.")
    (media-type
-    "mediaType"
+    "mediaType" :initarg :media-type
     :documentation "Identifies the MIME media type of the value of the content property. If not specified, the content property is assumed to contain text/html content.")
    (duration
-    "duration"
+    "duration" :initarg :duration
     :documentation "When the object describes a time-bound resource, such as an audio or video, a meeting, etc, the duration property indicates the object's approximate duration. The value MUST be expressed as an xsd:duration as defined by [ xmlschema11-2], section 3.3.6 (e.g. a period of 5 seconds is represented as “PT5S”).")
 
    ;; Required actor slots
    (inbox
-    "inbox"
+    "inbox" :initarg :inbox
     :documentation "A reference to an OrderedCollection comprised of all the messages received by the actor.")
    (outbox
-    "outbox"
+    "outbox" :initarg :outbox
     :documentation "An OrderedCollection comprised of all the messages produced by the actor.")
    (following
-    "following"
+    "following" :initarg :following
     :documentation "A link to a collection of the actors that this actor is following.")
    (followers
-    "followers"
+    "followers" :initarg :followers
     :documentation "A link to a collection of the actors that follow this actor.")
 
    ;; Optional Actor slots
    (liked
-    "liked"
+    "liked" :initarg :liked
     :documentation "A link to a collection of objects this actor has liked.")
    (streams
-    "streams"
+    "streams" :initarg :streams
     :documentation "A list of supplementary Collections which may be of interest.")
    (preferred-username
-    "preferredUsername"
+    "preferredUsername" :initarg :preferred-username
     :documentation "A short username which may be used to refer to the actor, with no uniqueness guarantees.")
    (endpoints
-    "endpoints"
+    "endpoints" :initarg :endpoints
     :documentation "A JSON object which maps additional (typically server/domain-wide) endpoints which may be useful either for this actor or someone referencing this actor. This mapping may be nested inside the actor document as the value or may be a link to a JSON-LD document with these properties.
 May include the properties “proxyUrl”, “oauthAuthorizationEndpoint”, “oauthTokenEndpoint”, “provideClientKey”, “signClientKey”, and “sharedInbox”.
 See the spec for details on these properties: https://www.w3.org/TR/activitypub/#proxyUrl"))
@@ -206,38 +206,38 @@ There is, in reality, no “Actor” supertype in ActivityPub; but it might be u
 (json-ld:define-json-type (link "Link") ()
   "https://www.w3.org/ns/activitystreams"
   ((json-ld:@id
-    "id"
+    "id" :initarg :@id
     :documentation "Provides the globally unique identifier for a Link.")
    (json-ld:@type
-    "type"
+    "type" :initarg :@type
     :documentation "Identifies the Link type. Multiple values may be specified.")
    (height
-    "height"
+    "height" :initarg :height
     :documentation "On a Link, specifies a hint as to the rendering height in device-independent pixels of the linked resource.")
    (href
-    "href"
+    "href" :initarg :href
     :documentation "The target resource pointed to by a Link.")
    (hreflang
-    "hreflang"
+    "hreflang" :initarg :hreflang
     :documentation "Hints as to the language used by the target resource. Value MUST be a [BCP47] Language-Tag.")
    (media-type
-    "mediaType"
+    "mediaType" :initarg :media-type
     :documentation "Identifies the MIME media type of the referenced resource.")
    (name
-    "name"
+    "name" :initarg :name
     :documentation "A simple, human-readable, plain-text name for the object. HTML markup MUST NOT be included. The name MAY be expressed using multiple language-tagged values. ")
    (preview
-    "preview"
+    "preview" :initarg :preview
     :documentation "Identifies an entity that provides a preview of this object. ")
    (rel
-    "rel"
+    "rel" :initarg :rel
     :documentation "A link relation associated with a Link. The value MUST conform to both the [HTML5] and [RFC5988] “link relation” definitions.
 In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0009), “LF” (U+000A), “FF” (U+000C), “CR” (U+000D) or “,” (U+002C) characters can be used as a valid link relation.")
    (summary
-    "summary"
+    "summary" :initarg :summary
     :documentation "A natural language summarization of the object encoded as HTML. Multiple language tagged summaries MAY be provided.")
    (width
-    "width"
+    "width" :initarg :width
     :documentation "Specifies a hint as to the rendering width in device-independent pixels of the linked resource.")))
 
 
@@ -245,22 +245,22 @@ In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0
 (json-ld:define-json-type (activity "Activity") (object)
   "https://www.w3.org/ns/activitystreams"
   ((actor
-    "actor"
+    "actor" :initarg :actor
     :documentation "Describes one or more entities that either performed or are expected to perform the activity. Any single activity can have multiple actors. The actor MAY be specified using an indirect Link.")
    (object
-    "object"
+    "object" :initarg :object
     :documentation "Describes the direct object of the activity. For instance, in the activity “John added a movie to his wishlist”, the object of the activity is the movie added.")
    (target
-    "target"
+    "target" :initarg :target
     :documentation "Describes the indirect object, or target, of the activity. The precise meaning of the target is largely dependent on the type of action being described but will often be the object of the English preposition ”to”. For instance, in the activity “John added a movie to his wishlist”, the target of the activity is John's wishlist. An activity can have more than one target.")
    (result
-    "result"
+    "result" :initarg :result
     :documentation "Describes the result of the activity. For instance, if a particular action results in the creation of a new resource, the result property can be used to describe that new resource.")
    (origin
-    "origin"
+    "origin" :initarg :origin
     :documentation "Describes an indirect object of the activity from which the activity is directed. The precise meaning of the origin is the object of the English preposition “from”. For instance, in the activity “John moved an item to List B from List A”, the origin of the activity is “List A”.")
    (instrument
-    "instrument"
+    "instrument" :initarg :instrument
     :documentation "Identifies one or more objects used (or to be used) in the completion of an Activity."))
   (:documentation "An Activity is a subtype of Object that describes some form of action that may happen, is currently happening, or has already happened. The Activity type itself serves as an abstract base type for all types of activities. It is important to note that the Activity type itself does not carry any specific semantics about the kind of action being taken."))
 
@@ -277,19 +277,19 @@ In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0
 (json-ld:define-json-type (collection "Collection") (object)
   "https://www.w3.org/ns/activitystreams"
   ((total-items
-    "totalItems"
+    "totalItems" :initarg :total-items
     :documentation "A non-negative integer specifying the total number of objects contained by the logical view of the collection. This number might not reflect the actual number of items serialized within the Collection object instance.")
    (current
-    "current"
+    "current" :initarg :current
     :documentation "In a paged Collection, indicates the page that contains the most recently updated member items.")
    (first
-    "first"
+    "first" :initarg :first
     :documentation "In a paged Collection, indicates the furthest preceeding page of items in the collection. ")
    (last
-    "last"
+    "last" :initarg :last
     :documentation "In a paged Collection, indicates the furthest proceeding page of the collection.")
    (items
-    "items"
+    "items" :initarg :items
     :documentation "Identifies the items contained in a collection. The items might be ordered or unordered."))
   (:documentation "A Collection is a subtype of Object that represents ordered or unordered sets of Object or Link instances."))
 
@@ -300,7 +300,7 @@ In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0
 (json-ld:define-json-type (ordered-collection "OrderedCollection") (collection)
   "https://www.w3.org/ns/activitystreams"
   ((ordered-items
-    "orderedItems"
+    "orderedItems" :initarg :ordered-items
     :documentation "Identifies the items contained in a collection. The items are necessarily ordered."))
   (:documentation "A subtype of Collection in which members of the logical collection are assumed to always be strictly ordered."))
 
@@ -309,13 +309,13 @@ In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0
 (json-ld:define-json-type (collection-page "CollectionPage") (collection)
   "https://www.w3.org/ns/activitystreams"
   ((part-of
-    "partOf"
+    "partOf" :initarg :part-of
     :documentation "Identifies the Collection to which a CollectionPage objects items belong.")
    (next
-    "next"
+    "next" :initarg :next
     :documentation "In a paged Collection, indicates the next page of items.")
    (prev
-    "prev"
+    "prev" :initarg :prev
     :documentation "In a paged Collection, identifies the previous page of items."))
   (:documentation "Used to represent distinct subsets of items from a Collection."))
 
@@ -324,7 +324,7 @@ In the [HTML5], any string not containing the “space” U+0020, “tab” (U+0
 (json-ld:define-json-type (ordered-collection-page "OrderedCollectionPage") (collection-page ordered-collection)
   "https://www.w3.org/ns/activitystreams"
   ((start-index
-    "startIndex"
+    "startIndex" :initarg :start-index
     :documentation "A non-negative integer value identifying the relative position within the logical view of a strictly ordered collection."))
   (:documentation "Used to represent ordered subsets of items from an OrderedCollection."))
 
@@ -363,13 +363,13 @@ The origin typically has no defined meaning.")
 (json-ld:define-json-type (question "Question") (intransitive-activity)
   "https://www.w3.org/ns/activitystreams"
   ((one-of
-    "oneOf"
+    "oneOf" :initarg :one-of
     :documentation "Identifies an exclusive option for a Question. Use of oneOf implies that the Question can have only a single answer. To indicate that a Question can have multiple answers, use anyOf.")
    (any-of
-    "anyOf"
+    "anyOf" :initarg :any-of
     :documentation "Identifies an inclusive option for a Question. Use of anyOf implies that the Question can have multiple answers. To indicate that a Question can have only one answer, use oneOf.")
    (closed
-    "closed"
+    "closed" :initarg :closed
     :documentation "Indicates that a question has been closed, and answers are no longer accepted."))
   (:documentation "Represents a question being asked. Question objects are an extension of IntransitiveActivity. That is, the Question object is an Activity, but the direct object is the question itself and therefore it would not contain an object property.
 Either of the ANY-OF and ONE-OF properties MAY be used to express possible answers, but a Question object MUST NOT have both properties."))
@@ -378,7 +378,7 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 (json-ld:define-json-type (arrive "Arrive") (intransitive-activity)
   "https://www.w3.org/ns/activitystreams"
   ((arrive
-    "Arrive"
+    "Arrive" :initarg :arrive
     :documentation "Indicates that the actor has arrived at the location. The origin can be used to identify the context from which the actor originated. The target typically has no defined meaning."))
   (:documentation "An IntransitiveActivity that indicates that the actor has arrived at the location. The origin can be used to identify the context from which the actor originated. The target typically has no defined meaning."))
 
@@ -439,22 +439,22 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 (json-ld:define-json-type (place "Place") (object)
   "https://www.w3.org/ns/activitystreams"
   ((accuracy
-    "accuracy"
+    "accuracy" :initarg :accuracy
     :documentation "Indicates the accuracy of position coordinates on a Place objects. Expressed in properties of percentage. e.g. “94.0” means “94.0% accurate”.")
    (altitude
-    "altitude"
+    "altitude" :initarg :altitude
     :documentation "Indicates the altitude of a place. The measurement units is indicated using the units property. If units is not specified, the default is assumed to be “m” indicating meters.")
    (latitude
-    "latitude"
+    "latitude" :initarg :latitude
     :documentation "The latitude of a place.")
    (longitude
-    "longitude"
+    "longitude" :initarg :longitude
     :documentation "The longitude of a place.")
    (radius
-    "radius"
+    "radius" :initarg :radius
     :documentation "The radius from the given latitude and longitude for a Place. The units is expressed by the units property. If units is not specified, the default is assumed to be “m” indicating “meters”.")
    (units
-    "units"
+    "units" :initarg :units
     :documentation "Specifies the measurement units for the radius and altitude properties on a Place object. If not specified, the default is assumed to be “m” for “meters”."))
   (:documentation "Represents a logical or physical location."))
 
@@ -463,7 +463,7 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 (json-ld:define-json-type (profile "Profile") (object)
   "https://www.w3.org/ns/activitystreams"
   ((describes
-    "describes"
+    "describes" :initarg :describes
     :documentation "The describes property identifies the object described by a Profile."))
   (:documentation "A Profile is a content object that describes another Object, typically used to describe Actor Type objects. The describes property is used to reference the object being described by the profile."))
 
@@ -472,13 +472,13 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 (json-ld:define-json-type (relationship "Relationship") (object)
   "https://www.w3.org/ns/activitystreams"
   ((subject
-    "subject"
+    "subject" :initarg :subject
     :documentation "The subject property identifies one of the connected individuals. For instance, for a Relationship object describing “John is related to Sally”, subject would refer to John.")
    (object
-    "object"
+    "object" :initarg :object
     :documentation "Describes the entity to which the subject is related.")
    (relationship
-    "relationship"
+    "relationship" :initarg :relationship
     :documentation "The relationship property identifies the kind of relationship that exists between subject and object."))
   (:documentation "Describes a relationship between two individuals. The subject and object properties are used to identify the connected individuals."))
 
@@ -487,10 +487,10 @@ Either of the ANY-OF and ONE-OF properties MAY be used to express possible answe
 (json-ld:define-json-type (tombstone "Tombstone") (object)
   "https://www.w3.org/ns/activitystreams"
   ((former-type
-    "formerType"
+    "formerType" :initarg :former-type
     :documentation "The formerType property identifies the type of the object that was deleted.")
    (deleted
-    "deleted"
+    "deleted" :initarg :deleted
     :documentation "The deleted property is a timestamp for when the object was deleted."))
   (:documentation "A Tombstone represents a content object that has been deleted. It can be used in Collections to signify that there used to be an object at this position, but it has been deleted."))
 

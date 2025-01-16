@@ -193,11 +193,11 @@ OPTIONS contains ordinary class options, in the format of DEFCLASS (for example,
 Here is a brief example partially defining the “Place” type from ActivityStreams:
 
   (define-json-type (place “Place”) (object) ctx
-    ((altitude  “altitude”
+    ((altitude  “altitude” :initarg altitude
                 :documentation “Indicates the altitude of a place.”)
-     (latitude  “latitude”
+     (latitude  “latitude” :initarg :latitude
                 :documentation “The latitude of a place.”)
-     (longitude “longitude”
+     (longitude “longitude” :initarg :longitude
                 :documentation “The longitude of a place.”)))"
   `(let ((json-class
            (define-json-clos-class ,names
