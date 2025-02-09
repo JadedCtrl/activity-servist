@@ -23,6 +23,9 @@
    ;; Classes
    :activity :note :object :person :update
    :chat-message :emoji :emoji-react :hashtag :property-value
+   :accept :add :create :delete :follow :ignore :join :leave :like
+   :offer :reject :remove :undo :view :listen :read :move :travel
+   :announce :flag :dislike
    ;; Slots/Accessors
    :also-known-as :atom-uri :capabilities :conversation :direct-message-p
    :discoverablep :former-representations :invisiblep :list-message
@@ -149,7 +152,7 @@ One known capabilitity-name is Pleroma’s “acceptsChatMessages”.")))
 
 
 ;; We want our new Actor-specific slots to take effect.
-(json-ld:define-json-type (person "Person") (as/v/a:actor object) *litepub-uri*
+(json-ld:define-json-type (person "Person") (as/v/a:person object) *litepub-uri*
   ()
   (:documentation "Represents an individual person."))
 

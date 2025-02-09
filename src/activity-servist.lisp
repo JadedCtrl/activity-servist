@@ -31,7 +31,7 @@
 
 ;;; Globals
 ;;; ————————————————————————————————————————
-(defvar *config* '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080
+[defvar *config* '(:host "http://localhost:8080" :address "127.0.0.1" :port 8080
                    :inbox-path "inbox")
   "Configuration for the server, a property-list.
 There are three optional properties:
@@ -50,7 +50,7 @@ There is one required property:
 :RETRIEVE should be a function of (RETRIEVE URI)
 This function should simply return an object from your storage, queried by a URI.
 The URI parameter is going to be either an @ID or an account-URI of the form
-“acct:username@hostname”.")
+“acct:username@hostname”."]
 
 (defvar       *logs*  nil "A list of incoming Clack HTTP requests, used for debugging.")
 (defparameter *debug* nil "Whether or not debugging-mode is on. More verbose errors, detailed logging, etc.")
@@ -69,7 +69,7 @@ The URI parameter is going to be either an @ID or an account-URI of the form
 (defun retrieve (uri)
   "Runs the user-defined callback RETRIEVE, as stored in *CONFIG*.
 Returns the object associated with the given URI from our object-store."
-  (let ((func (getf *config* :retrieve)))
+  (let {[func (getf *config* :retrieve)]}
     (if func
         (funcall func uri)
         (error "No RETRIEVE function found in ACTIVITY-SERVIST:*CONFIG*."))))
@@ -90,7 +90,7 @@ Actors, and then calls RECEIVE on them in turn."))
 ;; We want to make sure that activity’s actors are being retrieved and stored,
 ;; so that we can validate HTTP signatures (when that gets implemented).
 (defmethod receive :before ((obj activity-vocabulary:activity))
-  (let* ((actor-uri (ignore-errors (activity-vocabulary:actor obj))))
+  (let* {[actor-uri (ignore-errors (activity-vocabulary:actor obj))]}
     (when actor-uri
       (or (retrieve actor-uri)
           (fetch-and-store actor-uri)))))
@@ -103,6 +103,8 @@ RETRIEVE, likely for caching purposes.
 You should overload this generic with a method accepting JSON-LD:OBJECTs, as it
 is necessary for activity-servist to function. When called by activity-servist,
 this is solely used to store fetched foreign objects."))
+
+;;(defun send (obj ))
 
 
 
@@ -125,7 +127,7 @@ Will throw a FETCH-ERROR if the HTTP request fails."
 along to our server for caching.
 If it STOREs sans an error (de-facto rejecting the object), return the parsed object.
 Otherwise, nil."
-  (let ((obj (fetch obj-uri)))
+  (let {[obj (fetch obj-uri)]}
     (when (and obj (ignore-errors (store obj)))
       obj)))
 
@@ -144,7 +146,7 @@ Returns the object if it was retrieved or fetched; nil otherwise."
 
 ;;; Signature HTTP-header parsing
 ;;; ————————————————————————————————————————
-(defun signature-valid-p (env activity &key (current-time (get-universal-time)))
+(defun signature-valid-p (env activity &key [current-time (get-universal-time)])
   "Return whether or not the Clack HTTP-request ENV’s signature is valid.
 Only RSA-SHA256 signatures are supported.
 Might provide a condition detailing the reason of the signature’s invalidity as
@@ -153,13 +155,13 @@ a second return-value.
 Follows (mostly) the specification of:
 https://swicg.github.io/activitypub-http-signature/"
   (handler-case
-      (let* ((headers          (getf env :headers))
-             (signature-header (gethash "signature" headers))
-             (signature-alist  (if signature-header
+      (let* {[headers          (getf env :headers)]
+             [signature-header (gethash "signature" headers)]
+             [signature-alist  (if signature-header
                                    (signature-header-parse signature-header)
-                                   (signal 'no-signature-header)))
-             (algorithm        (assoc :algorithm signature-alist))
-             (signed-str       (signed-string env signature-alist :current-time current-time)))
+                                   (signal 'no-signature-header))]
+             [algorithm        (assoc :algorithm signature-alist)]
+             [signed-str       (signed-string env signature-alist :current-time current-time)]}
         (when (and algorithm (not (string-equal (cdr algorithm) "rsa-sha256")))
           (signal 'invalid-signature-algorithm :algorithm (cdr algorithm)))
         (when (not (matching-domains-p signature-alist activity))
@@ -186,9 +188,8 @@ case, return a 404 or a 410 HTTP error."
         (progn (as/u:http-get (as/v/a:object activity))
                nil)
       (as/u:http-get-error (err)
-        (let ((status (slot-value err 'as/u:status)))
+        (let {[status (slot-value err 'as/u:status)]}
           (member status '(404 410)))))))
-
 
 (defun matching-domains-p (signature-alist activity)
   "Returns whether or not the domain names within an ACTIVITY match, for ensuring
@@ -202,7 +203,7 @@ the ACTIVITY did indeed come from that domain."
                (json-ld:object
                 (json-ld:@id slot-value))))
            (domain-name (slot-value)
-             (let ((uri-string (uri-string slot-value)))
+             (let {[uri-string (uri-string slot-value)]}
                (when uri-string
                  (quri:uri-domain (quri:uri uri-string))))))
     (equal*
@@ -225,16 +226,16 @@ the ACTIVITY did indeed come from that domain."
                     (string-trim '(#\") value))))
           (str:split #\, signature-header)))
 
-(defun signed-string (env signature-alist &key (current-time (get-universal-time)))
+(defun signed-string (env signature-alist &key [current-time (get-universal-time)])
   "Generate the string that was signed for the signature-header of the Clack HTTP request ENV.
 Will error our if the request’s Digest or Date headers don’t match our calculated values."
-  (let* ((headers      (getf env :headers))
-         (header-names (signed-header-names signature-alist)))
+  (let* {[headers      (getf env :headers)]
+         [header-names (signed-header-names signature-alist)]}
     (reduce
      (lambda (a b) (format nil "~A~%~A" a b))
      (mapcar
       (lambda (header-name)
-        (let ((header-value (gethash header-name headers)))
+        (let {[header-value (gethash header-name headers)]}
           (str:string-case (string-downcase header-name)
             ;; (request-target) is a pseudo-header formatted like “post /inbox”.
             ("(request-target)"
@@ -244,8 +245,8 @@ Will error our if the request’s Digest or Date headers don’t match our calcu
                      (getf env :path-info)))
             ;; Calculate digest ourselves; never can’t trust the enemy!
             ("digest"
-             (let ((our-digest
-                     (format nil "SHA-256=~A" (as/s:string-sha256sum (body-contents env)))))
+             (let {[our-digest
+                     (format nil "SHA-256=~A" (as/s:string-sha256sum (body-contents env)))]}
                (if (equal our-digest header-value)
                    (format nil "~A: ~A" header-name our-digest)
                    (signal 'invalid-signature-digest :digest header-value :our-digest our-digest))))
@@ -253,7 +254,7 @@ Will error our if the request’s Digest or Date headers don’t match our calcu
             ;; I reckon two hours is a good-enough margin of error.
             ;; Or maybe I’m too lenient? ;P
             ("date"
-             (let ((their-time (cl-date-time-parser:parse-date-time header-value)))
+             (let {[their-time (cl-date-time-parser:parse-date-time header-value)]}
                (if (< (abs (- current-time their-time))
                       7200) ; Two hours in seconds
                    (format nil "~A: ~A" header-name header-value)
@@ -342,24 +343,24 @@ Public keys are hash-tables, which should look more-or-less like so:
 (defun signature-key-owner (signature-alist)
   "Return a the owning actor (likely as a LITEPUB:PERSON) of the public key
 corresponding to the given SIGNATURE-ALIST (of SIGNATURE-HEADER-PARSE's format)."
-  (let* ((key-uri         (cdr (assoc :keyid signature-alist)))
-         (maybe-owner-uri (car (str:split #\# key-uri)))
+  (let* {[key-uri         (cdr (assoc :keyid signature-alist))]
+         [maybe-owner-uri (car (str:split #\# key-uri))]
          ;; A common URI for keys is /users/user#keyname; so we try to save an HTTP request by
          ;; checking the object store for /users/user as an ID.
-         (data            (or (retrieve          maybe-owner-uri)
-                              (retrieve-or-fetch key-uri))))
+         [data            (or (retrieve          maybe-owner-uri)
+                              (retrieve-or-fetch key-uri))]}
     (typecase data
       (hash-table
-       (retrieve-or-fetch (gethash "https://w3id.org/security#owner" result)))
-      (litepub:person
+       (retrieve-or-fetch (gethash "https://w3id.org/security#owner" data)))
+      (activity-vocabulary:person
        data))))
 
 (defun actor-key-of-id (actor id)
   "Search through an ActivityPub ACTOR’s public keys, returning the one
 whose @id matches ID.
 The public key will be a hash-table; see SIGNATURE-KEY’s docstring for info."
-  (let* ((key-or-keys (ignore-errors (litepub:public-key actor)))
-         (keys        (if (listp key-or-keys) key-or-keys (list key-or-keys))))
+  (let* {[key-or-keys (ignore-errors (litepub:public-key actor))]
+         [keys        (if (listp key-or-keys) key-or-keys (list key-or-keys))]}
     (find id keys :test (lambda (key-id key)
                           (equal (gethash "@id" key) key-id)))))
 
@@ -387,7 +388,7 @@ The public key will be a hash-table; see SIGNATURE-KEY’s docstring for info."
 (defun webfinger-resource-info (resource)
   "Given a Webfinger RESOURCE, return a property-list of data on the given resource.
 Will "
-  (let ((obj (retrieve resource)))
+  (let {[obj (retrieve resource)]}
     (and obj (webfinger-info resource obj))))
 
 (defgeneric webfinger-info (resource obj)
@@ -400,7 +401,7 @@ For information on the property-list’s format, see the dosctring of WEBTENTACL
 ;; A default implementation, which provides (likely) all of the information
 ;; necessary for most use-cases.
 (defmethod webfinger-info (resource (obj json-ld:object))
-  (let ((obj-uri (json-ld:@id obj)))
+  (let {[obj-uri (json-ld:@id obj)]}
     (list
      :subject resource
      :aliases (list obj-uri)
@@ -420,9 +421,9 @@ For information on the property-list’s format, see the dosctring of WEBTENTACL
 (defun http-object (env path-items params)
   "If an ActivityPub object is requested, serve it (if such an object
 can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
-  (let* ((uri (reduce (lambda (a b) (format nil "~A/~A" a b))
-                     (append (list (getf *config* :host)) path-items)))
-         (obj (retrieve uri)))
+  (let* {[uri (reduce (lambda (a b) (format nil "~A/~A" a b))
+                     (append (list (getf *config* :host)) path-items))]
+         [obj (retrieve uri)]}
     (if obj
         (list 200 '(:content-type "application/activity+json")
               (list (yason:with-output-to-string* () (yason:encode-object obj))))
@@ -436,8 +437,8 @@ can be found). Uses the callback :RETRIEVE, defined in *CONFIG*."
 (defun http-inbox (env path-items params)
   "If one tries to send an activity to our inbox, pass it along to
 the overloaded RECEIVE method."
-  (let* ((contents      (body-contents env))
-         (json-contents (json-ld:parse contents)))
+  (let* {[contents      (body-contents env)]
+         [json-contents (json-ld:parse contents)]}
     (multiple-value-bind (signature-valid-p signature-error)
         (signature-valid-p env json-contents)
       (cond (signature-error (signal signature-error))
@@ -445,7 +446,7 @@ the overloaded RECEIVE method."
              (signal 'http-result :status 401 :message "Failed to verify signature. Heck! TvT"))
             ((receive json-contents)
              '(200 (:content-type "text/plain") ("You win!")))))))
-
+;;
 
 
 ;;; Sending a note
@@ -474,7 +475,7 @@ the overloaded RECEIVE method."
   '(:short-weekday ", " (:day 2) " " :short-month " " (:year 4) " "
     (:hour 2) #\: (:min 2) #\: (:sec 2) " " :timezone))
 
-(defun note-headers (inbox from to json)
+(defun note-headers (inbox from to json private-pem)
   (let* ((inbox-uri (quri:uri inbox))
          (digest-header (str:concat "SHA-256=" (as/s:string-sha256sum json)))
          (date-header
@@ -489,7 +490,7 @@ the overloaded RECEIVE method."
             (format nil "host: ~A~%" (quri:uri-host inbox-uri))
             (format nil "date: ~A~%" date-header)
             (format nil "digest: ~A" digest-header)))
-         (signature (sign-string *privkey* signed-headers))
+         (signature (apply #'str:concat (str:lines (as/s:sign-string private-pem signed-headers))))
          (signature-header (str:concat "keyId=\"" from "#main-key\","
                                        "algorithm=\"rsa-sha256\","
                                        "headers=\"(request-target) host date digest\","
@@ -503,8 +504,8 @@ the overloaded RECEIVE method."
       ("Content-Type" . "application/activity+json"))))
 
 (defun send-note (inbox from to text)
-  (let* ((json (note-json from to text))
-         (headers (note-headers inbox from to json)))
+  (let* {[json (note-json from to text)]
+         [headers (note-headers inbox from to json)]}
     nil))
 
 
@@ -522,31 +523,31 @@ the overloaded RECEIVE method."
 ;;; ————————————————————————————————————————
 (defun server (env)
   "Returns the response data for Clack, given the request property-list ENV."
-  (logs-push env)
-  (handler-case
-      (let* ((path   (pathname-sans-parameters (getf env :request-uri)))
-             (params (pathname-parameters      (getf env :request-uri)))
-             (response-function
+      (logs-push env)
+;;  (handler-case
+      (let* {[path   (pathname-sans-parameters (getf env :request-uri))]
+             [params (pathname-parameters      (getf env :request-uri))]
+             [response-function
                (or (assoc-by-path (directories) (pathname-components path))
-                   '("" . http-404)))
+                   '("" . http-404))]
              ;; So that response functions only deal with relative paths…
-             (path-sans-response-root
+             [path-sans-response-root
                (pathname-components
-                (str:replace-first (car response-function) "" path))))
+                (str:replace-first (car response-function) "" path))]}
         (or (funcall (cdr response-function) env path-sans-response-root params)
-            (funcall 'http-404 env path-sans-response-root params)))
+            (funcall 'http-404 env path-sans-response-root params))))
     ;; For our pretty user-facing errors, return the status and message.
-    (http-result (err)
-      (logs-push err)
-      `(,(slot-value  err 'status) (:content-type "text/plain")
-        (,(or (slot-value err 'message)
-              (princ-to-string err)))))
+;;    (http-result (err)
+;;      (logs-push err)
+;;      `(,(slot-value  err 'status) (:content-type "text/plain")
+;;        (,(or (slot-value err 'message)
+;;              (princ-to-string err))))))
     ;; For non-pretty errors, give a cryptic message (unless in *debug*-mode).
-    (condition (err)
-      (logs-push err)
-      `(500 (:content-type "text/plain")
-            (,(or (and *debug* (princ-to-string err))
-                  "I am ERROR. 🥴"))))))
+;;    (condition (err)
+;;      (logs-push err)
+;;      `(500 (:content-type "text/plain")
+;;            (,(or (and *debug* (princ-to-string err))
+;;                  "I am ERROR. 🥴")))))))
 
 (defun start-server ()
   "Start the server."
@@ -566,7 +567,7 @@ contents as a string. They are read from :RAW-BODY in this plist.
 
 If the contents are a stream, the stream’s contents will be read into a
 string and the stream’s object in ENV will be replaced with the string."
-  (let ((body (getf env :raw-body)))
+  (let {[body (getf env :raw-body)]}
     (if (stringp body)
         body
         (setf (getf env :raw-body)
@@ -585,7 +586,7 @@ pathname as key. If the exact path isn't a valid key, it will
 try all parent directories.
 E.g., “/bear/apple/momma/” could match either “/bear/apple/momma”
 or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
-  (let ((path (str:join #\/ path-items)))
+  (let {[path (str:join #\/ path-items)]}
     (if (eq path-items nil)
         (assoc "" alist :test 'string=)
         (or (and (eq depth 0)
@@ -607,7 +608,7 @@ or “/bear/apple/” or “/bear/”, but not “/bear” (not a directory)."
 “/path/a/b?a=1&b=2&c=3” → ((“a” . “1”) (“b” . “2”) (“c” . “3”))"
   (mapcar
    (lambda (pair)
-     (let ((pair-items (str:split #\= pair)))
+     (let {[pair-items (str:split #\= pair)]}
        (cons (car pair-items)
              (cadr pair-items))))
    (str:split #\&  (cadr (str:split #\? path)))))

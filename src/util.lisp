@@ -28,6 +28,25 @@
 
 (in-package #:activity-servist/util)
 
+
+;;; Reader macros
+;;; ————————————————————————————————————————
+;; Look, we *love* the [multiple {bracket-types [style]}].
+(set-macro-character #\] (get-macro-character #\)))
+(set-macro-character #\[
+  (lambda (stream char)
+    (declare (ignore char))
+    (read-delimited-list #\] stream t)))
+
+(set-macro-character #\} (get-macro-character #\)))
+(set-macro-character #\{
+  #'(lambda (stream char)
+      (read-delimited-list #\} stream t)))
+
+
+
+;;; Functions
+;;; ————————————————————————————————————————
 (defun http-get (uri &key (accept "application/activity+json,application/ld+json"))
   "Perform a GET request, returning two values: The response-body’s string, and the status code.
 :ACCEPT, defaulting to ActivityPub-related types, corresponds to the “Accept” header.

@@ -1,6 +1,6 @@
 ;;;; activity-servist/signatures: Handle AP-compatible HTTP signatures.
 
-;; Copyright © 2023-2024 Jaidyn Levesque <jadedctrl@posteo.at>
+;; Copyright © 2023-2025 Jaidyn Ann <jadedctrl@posteo.at>
 ;;
 ;; This program is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU Affero General Public License
@@ -25,6 +25,26 @@
 (in-package #:activity-servist/signatures)
 
 
+;;; Macros
+;;; ————————————————————————————————————————
+(defmacro with-temporary-file (varspec &body body)
+  "A wrapper around UIOP:WITH-TEMPORARY-FILE that ensures the file is only readable
+by the current process’es user, and writes a default content-string to it.
+
+VARSPEC should be of the form: (PATH-SYM PREFIX-STRING CONTENT-STRING-OR-USB8-ARRAY)"
+  (destructuring-bind (pathname prefix contents)
+      varspec
+    `(uiop:with-temporary-file (:pathname ,pathname :prefix ,prefix)
+       (setf (osicat:file-permissions ,pathname) '(:user-read :user-write))
+       (typecase ,contents
+         (string
+          (alexandria:write-string-into-file ,contents ,pathname :if-exists :overwrite))
+         ((simple-array (unsigned-byte 8))
+          (alexandria:write-byte-vector-into-file ,contents ,pathname :if-exists :overwrite)))
+       ,@body)))
+
+
+
 ;;; Key-generation
 ;;; ————————————————————————————————————————
 ;; At the moment, I’ve yet to use figure out how to create PEM representations of
@@ -35,7 +55,6 @@
 ;; Yes, I know, this is absolutely horrific. Actually disgusting.
 ;; But at the moment,I want to focus on other core parts of ActivityPub; I’ve
 ;; tired of messing with ASN1 & co. That’s for another day! ^^
-
 (defun generate-key-pair ()
   "Generate a 2048-bit RSA key-pair in PEM-format using the host system’s `openssl` binary.
 It returns two values: The private key, then the public key."
@@ -51,8 +70,6 @@ It returns two values: The private key, then the public key."
 
 ;;; Signing & verification
 ;;; ————————————————————————————————————————
-(defmacro with-temporary-file (varspec &body body)) ; Stub, defined below.
-
 (defun sign-string (private-pem-string string)
   "RSA-SHA256 signs a STRING with a private key, returning a base64 string.
 Uses the host-system’s `base64`, `openssl`, & `printf` binaries."
@@ -71,7 +88,7 @@ Uses the host-system’s `openssl` & `printf` binaries."
       (let ((signature-usb8-array (base64:base64-string-to-usb8-array signature)))
         (with-temporary-file   (key-pathname "activityservist-" public-pem-string)
           (with-temporary-file (sig-pathname "activityservist-" signature-usb8-array)
-            ;; (inferior-shell:run/nil `(cp ,key-pathname /tmp/key.pem)) 
+            ;; (inferior-shell:run/nil `(cp ,key-pathname /tmp/key.pem))
             ;; (inferior-shell:run/nil `(cp ,sig-pathname /tmp/sig)) ; Useful for debugging
             (inferior-shell:run/lines
              `(inferior-shell:pipe
@@ -99,18 +116,5 @@ Uses the host-system’s `openssl` & `printf` binaries."
    digest-spec
    (flexi-streams:string-to-octets string :external-format 'utf-8)))
 
-(defmacro with-temporary-file (varspec &body body)
-  "A wrapper around UIOP:WITH-TEMPORARY-FILE that ensures the file is only readable
-by the current process’es user, and writes a default content-string to it.
 
-VARSPEC should be of the form: (PATH-SYM PREFIX-STRING CONTENT-STRING-OR-USB8-ARRAY)"
-  (destructuring-bind (pathname prefix contents)
-      varspec
-    `(uiop:with-temporary-file (:pathname ,pathname :prefix ,prefix)
-       (setf (osicat:file-permissions ,pathname) '(:user-read :user-write))
-       (typecase ,contents
-         (string
-          (alexandria:write-string-into-file ,contents ,pathname :if-exists :overwrite))
-         ((simple-array (unsigned-byte 8))
-          (alexandria:write-byte-vector-into-file ,contents ,pathname :if-exists :overwrite)))
-       ,@body)))
+

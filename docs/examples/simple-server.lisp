@@ -1,6 +1,6 @@
 ;;;; simple-server: A bare-bones example ActivityPub instance.
 
-;; Written in 2024 by Jaidyn Levesque <jadedctrl@posteo.at>
+;; Written in 2024–2025 by Jaidyn Levesque <jadedctrl@posteo.at>
 ;;
 ;; To the extent possible under law, the author(s) have dedicated
 ;; all copyright and related and neighboring rights to this
@@ -46,7 +46,7 @@ For example: “https://localhost:8080/users/lena”.")
   "Start the server; simple and to-the-point."
   (clack:clackup
    (lambda (env)
-     (let ((activity-servist:*config* *config*))
+     (let {[activity-servist:*config* *config*]}
        (activity-servist:server env)))
    :server  'woo
    :address (getf *config* :address)
@@ -66,7 +66,7 @@ For example: “https://localhost:8080/users/lena”.")
   "activity-servist callback: Returns the JSON-LD OBJECT of the given @ID or URI
 from our object-store.
 This example server simply stores objects in a hash-table mapping IDs to objects."
-  (let ((id (or (uri->id uri) uri)))
+  (let {[id (or (uri->id uri) uri)]}
     (gethash id *store*)))
 
 
@@ -92,8 +92,8 @@ For most cases, returning URI-STR directly is what you want. But there are two e
   • Aliases, if an object can be accessed through several URIs.
 
 This example only handles the first exception, acct: URIs."
-  (let* ((uri    (quri:uri uri-str))
-         (scheme (quri:uri-scheme uri)))
+  (let* {[uri    (quri:uri uri-str)]
+         [scheme (quri:uri-scheme uri)]}
     (if (or (not scheme)
             (equal scheme "acct"))
         (acct-uri->id uri)
@@ -102,10 +102,10 @@ This example only handles the first exception, acct: URIs."
 (defun acct-uri->id (uri)
   "Helper-function for URI->ID. Returns the @ID of an acct:-format URI.
 That is, an “acct:username@host.tld” URI."
-  (let* ((path             (quri:uri-path uri))
-         (sans-preceding-@ (if (str:starts-with-p "@" path)
+  (let* {[path             (quri:uri-path uri)]
+         [sans-preceding-@ (if (str:starts-with-p "@" path)
                                (subseq path 1)
-                               path)))
+                               path)]}
     (destructuring-bind (user host)
         (str:split "@" sans-preceding-@)
       (format nil *user-id-format*
@@ -115,7 +115,7 @@ That is, an “acct:username@host.tld” URI."
   "Helper-function for ACCT-URI->ID. From a hostname, returns “scheme://hostname”.
 If it matches our configured :HOST (in *CONFIG*), simply returns :HOST’s value.
 Otherwise, assume “https”."
-  (let ((our-host (getf *config* :host)))
+  (let {[our-host (getf *config* :host)]}
     (if (equal (quri:uri-host (quri:uri our-host)) hostname)
         our-host
         (format nil "https://~A" hostname))))
@@ -145,18 +145,20 @@ Otherwise, assume “https”."
 (defun make-user (username nickname)
   "Create a USER of the given USERNAME and NICKNAME.
 The ID and ENDPOINTS are derived using the parameter USERNAME and the global *USER-ID-FORMAT*."
-  (let ((obj (make-instance 'user))
-        (uri (format nil *user-id-format*
-                     (getf *config* :host) username)))
-    (flet ((sub-user-uri (path)
-             (format nil "~A/~A" uri path))
-           (sub-host-uri (path)
-             (format nil "~A/~A" (getf *config* :host) path)))
-      (setf (ass:preferred-username obj) username)
-      (setf (ass:name obj)      nickname)
-      (setf (ass:inbox obj)     (sub-host-uri "inbox"))
-      (setf (ass:outbox obj)    (sub-host-uri "outbox"))
-      (setf (ass:following obj) (sub-user-uri "following"))
-      (setf (ass:followers obj) (sub-user-uri "followers"))
-      (setf (json-ld:@id obj)   uri))
-   obj))
+  (let {[uri (format nil *user-id-format*
+                     (getf *config* :host) username)]}
+    (flet {[sub-user-uri (path)
+             (format nil "~A~A" uri path)]
+           [sub-host-uri (path)
+             (format nil "~A~A" (getf *config* :host) path)]}
+      (make-instance 'user :@id  uri
+                           :name nickname
+                           :preferred-username username
+                           :inbox      (sub-host-uri "/inbox")
+                           :outbox     (sub-host-uri "/outbox")
+                           :following  (sub-user-uri "/following")
+                           :followers  (sub-user-uri "/followers")
+                           :public-key (alexandria:alist-hash-table
+                                        `(("id" . ,(sub-user-uri "#main-key"))
+                                          ("owner" . ,uri)
+                                          ("publicKeyPem" . ,*public-key*)))))))
