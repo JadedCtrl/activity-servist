@@ -54,9 +54,9 @@ For example: “https://localhost:8080/users/lena”.")
 
 (defun seed ()
   "Seed our server with some random users, for testing purposes."
-  (save (make-user "maria"   "Maria ^_^"))
-  (save (make-user "melanie" "Melanie >:o"))
-  (save (make-user "jorge"   "Jorge 🦆")))
+  (as:store (make-user "maria5"  "Maria ^_^"))
+  (as:store (make-user "melanie" "Melanie >:o"))
+  (as:store (make-user "jorge"   "Jorge 🦆")))
 
 
 
@@ -124,20 +124,20 @@ Otherwise, assume “https”."
 
 ;;; Users
 ;;; ————————————————————————————————————————
-(defclass user (ass:person lp:object)
-  ((inbox
+(defclass user (lp:person)
+  ((our-inbox
     :accessor user-inbox
     :initform nil
     :documentation "A list of objects in the user’s inbox.")
-   (outbox
+   (our-outbox
     :accessor user-outbox
     :initform nil
     :documentation "A list of objects in the user’s outbox.")
-   (following
+   (our-following
      :accessor user-following
      :initform nil
      :documentation "A list of Actor objects that the user is following.")
-   (followers
+   (our-followers
     :accessor user-followers
     :initform nil
     :documentation "A list of Actor objects that follow the user.")))
