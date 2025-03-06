@@ -521,38 +521,43 @@ the overloaded RECEIVE method."
 
 ;;; Invocation
 ;;; ————————————————————————————————————————
+(defmacro handle-server-errors (&body body)
+  `(handler-case
+       ,@body
+     ;; For our pretty user-facing errors, return the status and message.
+     (http-result (err)
+       (logs-push err)
+       (list (slot-value  err 'status) '(:content-type "text/plain")
+             (list (or (slot-value err 'message)
+                       (princ-to-string err)))))
+    ;; For non-pretty errors, give a cryptic message (unless in *debug*-mode).
+    (condition (err)
+      (logs-push err)
+      (list 500 '(:content-type "text/plain")
+            (list (or (and *debug* (princ-to-string err))
+                      "I am ERROR. 🥴"))))))
+
 (defun server (env)
   "Returns the response data for Clack, given the request property-list ENV."
-      (logs-push env)
-;;  (handler-case
-      (let* {[path   (pathname-sans-parameters (getf env :request-uri))]
-             [params (pathname-parameters      (getf env :request-uri))]
-             [response-function
-               (or (assoc-by-path (directories) (pathname-components path))
-                   '("" . http-404))]
-             ;; So that response functions only deal with relative paths…
-             [path-sans-response-root
-               (pathname-components
-                (str:replace-first (car response-function) "" path))]}
-        (or (funcall (cdr response-function) env path-sans-response-root params)
-            (funcall 'http-404 env path-sans-response-root params))))
-    ;; For our pretty user-facing errors, return the status and message.
-;;    (http-result (err)
-;;      (logs-push err)
-;;      `(,(slot-value  err 'status) (:content-type "text/plain")
-;;        (,(or (slot-value err 'message)
-;;              (princ-to-string err))))))
-    ;; For non-pretty errors, give a cryptic message (unless in *debug*-mode).
-;;    (condition (err)
-;;      (logs-push err)
-;;      `(500 (:content-type "text/plain")
-;;            (,(or (and *debug* (princ-to-string err))
-;;                  "I am ERROR. 🥴")))))))
+  (let* {[path   (pathname-sans-parameters (getf env :request-uri))]
+         [params (pathname-parameters      (getf env :request-uri))]
+         [response-function
+           (or (assoc-by-path (directories) (pathname-components path))
+               '("" . http-404))]
+         ;; So that response functions only deal with relative paths…
+         [path-sans-response-root
+           (pathname-components
+            (str:replace-first (car response-function) "" path))]}
+    (or (funcall (cdr response-function) env path-sans-response-root params)
+        (funcall 'http-404 env path-sans-response-root params))))
 
 (defun start-server ()
   "Start the server."
   (clack:clackup (lambda (env)
-                   (server env))
+                   (if *debug*
+                       (progn (logs-push env)
+                              (server env))
+                       (handle-server-errors (server env))))
                  :server 'woo
                  :address "0.0.0.0"
                  :port (getf *config* :port)))
