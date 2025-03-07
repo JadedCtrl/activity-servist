@@ -21,6 +21,7 @@
   (:export
    ;; Functions
    :server :start-server
+   :send
    ;; Methods
    :receive :store
    ;; Globals
@@ -54,6 +55,9 @@ The URI parameter is going to be either an @ID or an account-URI of the form
 
 (defvar       *logs*  nil "A list of incoming Clack HTTP requests, used for debugging.")
 (defparameter *debug* nil "Whether or not debugging-mode is on. More verbose errors, detailed logging, etc.")
+
+(defparameter *private-key* nil
+  "The private RSA key used for signing outgoing HTTP requests, as a PEM string.")
 
 (defun directories ()
   "Alist of the server's paths and their response functions."
@@ -455,33 +459,31 @@ the overloaded RECEIVE method."
 
 ;;; Sending a note
 ;;; ————————————————————————————————————————
-(defun note-json (from to text)
-  "The JSON of a user's actor."
-  (let* ((user-root from)
-         (yason:*symbol-encoder* 'yason:encode-symbol-as-lowercase))
-    (yason:with-output-to-string* ()
-      (yason:encode-alist
-       `(("@context" . ("https://www.w3.org/ns/activitystreams"
-                        "https://litepub.social/litepub/context.jsonld"))
-         ("id" . ,(format nil "~A" (random 900000)))
-         ("actor" . ,user-root)
-         ("type" . "Create")
-         ("object"
-          . ,(alexandria:plist-hash-table
-              (list
-               "id" (format nil "~A" (random 900000))
-               "type" "Note"
-               "attributedTo" user-root
-               "content" text
-               "to" (if (listp to) to (list to))))))))))
+(defun send (from to object &key (private-key *private-key*))
+  "Sends an OBJECT to a user in the fediverse.
+
+FROM is either a PERSON object or a user-id (URL) string.
+TO is either a PERSON object or the destination’s inbox URI.
+PRIVATE-KEY is an RSA private key as a PEM string."
+  (let* {[inbox-uri (or (and (stringp to) to)
+                        (as/v/a:inbox to))]
+         [sender-id (or (and (stringp from) from)
+                        (json-ld:@id from))]
+         [json      (yason:with-output-to-string* () (yason:encode-object object))]
+         [headers   (make-send-headers inbox-uri sender-id private-key json)]}
+    (dexador:post inbox-uri :content json :headers headers)))
 
 (defvar +date-header-datetime-format+
   '(:short-weekday ", " (:day 2) " " :short-month " " (:year 4) " "
     (:hour 2) #\: (:min 2) #\: (:sec 2) " " :timezone))
 
-(defun note-headers (inbox from to json private-pem)
-  (let* ((inbox-uri (quri:uri inbox))
-         (digest-header (str:concat "SHA-256=" (as/s:string-sha256sum json)))
+
+(defun make-send-headers (inbox-uri sender-id private-pem content)
+  "Returns an association list of headers to be used in the POST request to INBOX-URI,
+sending CONTENT from fediverse user SENDER-ID.
+Headers are signed with the RSA key PRIVATE-PEM."
+  (let* ((inbox-quri (quri:uri inbox-uri))
+         (digest-header (str:concat "SHA-256=" (as/s:string-sha256sum content)))
          (date-header
            (let ((local-time:*default-timezone* local-time:+gmt-zone+))
              (local-time:format-timestring
@@ -490,27 +492,22 @@ the overloaded RECEIVE method."
          (signed-headers
            (concatenate
             'string
-            (format nil "(request-target): post ~A~%" (quri:uri-path inbox-uri))
-            (format nil "host: ~A~%" (quri:uri-host inbox-uri))
+            (format nil "(request-target): post ~A~%" (quri:uri-path inbox-quri))
+            (format nil "host: ~A~%" (quri:uri-host inbox-quri))
             (format nil "date: ~A~%" date-header)
             (format nil "digest: ~A" digest-header)))
          (signature        (as/s:sign-string private-pem signed-headers))
-         (signature-header (str:concat "keyId=\"" from "#main-key\","
+         (signature-header (str:concat "keyId=\"" sender-id "#main-key\","
                                        "algorithm=\"rsa-sha256\","
                                        "headers=\"(request-target) host date digest\","
                                        "signature=\"" signature "\"")))
     `(("Date" . ,date-header)
       ("Digest" . ,digest-header)
       ("Signature" . ,signature-header)
-      ("Host" . ,(quri:uri-host inbox-uri))
-      ("Content-Length" . ,(length json))
+      ("Host" . ,(quri:uri-host inbox-quri))
+      ("Content-Length" . ,(length content))
       ("Accept" . "application/activity+json")
       ("Content-Type" . "application/activity+json"))))
-
-(defun send-note (inbox from to text)
-  (let* {[json (note-json from to text)]
-         [headers (note-headers inbox from to json)]}
-    nil))
 
 
 
