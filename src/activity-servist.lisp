@@ -166,7 +166,7 @@ https://swicg.github.io/activitypub-http-signature/"
           (signal 'invalid-signature-algorithm :algorithm (cdr algorithm)))
         (when (not (matching-domains-p signature-alist activity))
           (signal 'invalid-signature-domain-mismatch))
-        (list
+        (as/s:signature-valid-p
          (gethash "https://w3id.org/security#publicKeyPem" (signature-key signature-alist))
          signed-str
          (cdr (assoc :signature signature-alist))))
@@ -490,7 +490,7 @@ the overloaded RECEIVE method."
             (format nil "host: ~A~%" (quri:uri-host inbox-uri))
             (format nil "date: ~A~%" date-header)
             (format nil "digest: ~A" digest-header)))
-         (signature (apply #'str:concat (str:lines (as/s:sign-string private-pem signed-headers))))
+         (signature        (as/s:sign-string private-pem signed-headers))
          (signature-header (str:concat "keyId=\"" from "#main-key\","
                                        "algorithm=\"rsa-sha256\","
                                        "headers=\"(request-target) host date digest\","

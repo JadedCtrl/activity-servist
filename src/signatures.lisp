@@ -74,11 +74,13 @@ It returns two values: The private key, then the public key."
   "RSA-SHA256 signs a STRING with a private key, returning a base64 string.
 Uses the host-system’s `base64`, `openssl`, & `printf` binaries."
   (with-temporary-file (key-pathname "activityservist-" private-pem-string)
-    (inferior-shell:run/s
-     `(inferior-shell:pipe
-       (printf ,string)
-       (openssl dgst -sha256 -sign ,key-pathname -)
-       (base64)))))
+    (apply #'str:concat
+           (str:lines
+            (inferior-shell:run/s
+             `(inferior-shell:pipe
+               (printf ,string)
+               (openssl dgst -sha256 -sign ,key-pathname -)
+               (base64)))))))
 
 (defun signature-valid-p (public-pem-string string signature)
   "Check the validity of a RSA-SHA256 SIGNATURE of a STRING.
