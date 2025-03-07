@@ -11,7 +11,7 @@
   :in-order-to ((test-op (test-op "activitypub/tests")))
   :depends-on (:activity-servist/vocab/litepub :activity-servist/signatures
                :activity-servist/util
-               :alexandria :clack :cl-date-time-parser :local-time :purl
+               :alexandria :clack :cl-date-time-parser :dexador :local-time :purl
                :str :webtentacle :yason)
   :components ((:file "src/activity-servist")))
 
@@ -56,7 +56,7 @@
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
   :depends-on (:activity-servist/util
-               :alexandria :closer-mop :quri :str :yason)
+               :alexandria :closer-mop :dexador :quri :str :yason)
   :components ((:file "src/json-ld")))
 
 
@@ -78,7 +78,7 @@
   :author "Jaidyn Ann <jadedctrl@posteo.at>"
   :homepage "https://hak.xwx.moe/jadedctrl/activity-servist"
 
-  :depends-on (:drakma :flexi-streams)
+  :depends-on (:flexi-streams)
   :components ((:file "src/util")))
 
 

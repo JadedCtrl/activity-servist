@@ -655,7 +655,7 @@ the directories *HTTP-CACHE-DIRS*, its contents will be returned instead."
               (when cached-filepath
                 (alexandria:read-file-into-string cached-filepath))))
       (setf (gethash uri *http-cache*) ; If not cached, download & cache it.
-            (as/u:http-get uri :accept accept))))
+            (dexador:get uri :headers `(("Accept" . ,accept))))))
 
 (defun find-file (file-leaf dirs)
   "Search for a file of the given name FILE-LEAF within directories DIRS.

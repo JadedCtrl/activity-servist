@@ -117,10 +117,14 @@ this is solely used to store fetched foreign objects."))
   "Fetch & parse an ActivityPub object from a foreign server; returning the object.
 Will throw a FETCH-ERROR if the HTTP request fails."
   (handler-case
-      (json-ld:parse (as/u:http-get obj-uri))
-    (as/u:http-get-error (err)
-      (error 'fetch-error :status (slot-value err 'as/u:status)
-                          :body   (slot-value err 'as/u:body)))))
+      (let* {[json-ld-mimetypes
+              "application/activity+json,application/ld+json"]
+             [response-body
+              (dexador:get obj-uri :headers `(("Accept" . ,json-ld-mimetypes)))]}
+        (json-ld:parse response-body))
+    (dexador.error:http-request-failed (err)
+      (error 'fetch-error :status (dexador.error:response-status err)
+                          :body   (dexador.error:response-body err)))))
 
 (defun fetch-and-store (obj-uri)
   "Fetch & parses an ActivityPub object from a foreign server; then try to pass it
@@ -185,10 +189,10 @@ what would be deleted — is actually deleted. Fetching the object must, in whic
 case, return a 404 or a 410 HTTP error."
   (when (typep activity 'as/v/a:delete)
     (handler-case
-        (progn (as/u:http-get (as/v/a:object activity))
+        (progn (dexador:get (as/v/a:object activity))
                nil)
-      (as/u:http-get-error (err)
-        (let {[status (slot-value err 'as/u:status)]}
+      (dexador.error:http-request-failed (err)
+        (let {[status (dexador.error:response-status err)]}
           (member status '(404 410)))))))
 
 (defun matching-domains-p (signature-alist activity)
