@@ -540,6 +540,7 @@ Headers are signed with the RSA key PRIVATE-PEM."
 
 (defun server (env)
   "Returns the response data for Clack, given the request property-list ENV."
+  (logs-push env)
   (let* {[path   (pathname-sans-parameters (getf env :request-uri))]
          [params (pathname-parameters      (getf env :request-uri))]
          [response-function
@@ -556,8 +557,7 @@ Headers are signed with the RSA key PRIVATE-PEM."
   "Start the server."
   (clack:clackup (lambda (env)
                    (if *debug*
-                       (progn (logs-push env)
-                              (server env))
+                       (server env)
                        (handle-server-errors (server env))))
                  :server 'woo
                  :address "0.0.0.0"
