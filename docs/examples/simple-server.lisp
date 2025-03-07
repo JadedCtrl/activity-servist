@@ -38,6 +38,11 @@
 The first parameter is the protocol+host, and the second is the username.
 For example: “https://localhost:8080/users/lena”.")
 
+(defvar *private-key* nil
+  "The RSA private key used for signing HTTP requests, as a PEM string.")
+(defvar *public-key* nil
+  "The PEM string for the *PRIVATE-KEY*’s public counterpart.")
+
 
 
 ;;; Invocation
@@ -57,6 +62,24 @@ For example: “https://localhost:8080/users/lena”.")
   (as:store (make-user "maria5"  "Maria ^_^"))
   (as:store (make-user "melanie" "Melanie >:o"))
   (as:store (make-user "jorge"   "Jorge 🦆")))
+
+(defun init-keys ()
+  "Loads or generates the RSA keypair used for signing HTTP requests to other
+servers. Reads/writes keys to `private.pem` & `public.pem` in activity-servist’s
+`docs/examples/` subdirectory."
+  (let {[private-pem-path
+          (asdf:system-relative-pathname 'activity-servist "docs/examples/private.pem")]
+        [public-pem-path
+          (asdf:system-relative-pathname 'activity-servist "docs/examples/public.pem")]}
+    (unless (and (probe-file private-pem-path)
+                 (setq *private-key* (alexandria:read-file-into-string private-pem-path))
+                 (probe-file public-pem-path)
+                 (setq *public-key* (alexandria:read-file-into-string public-pem-path)))
+      (multiple-value-bind (private-pem-str public-pem-str)
+          (as/s:generate-key-pair)
+        (alexandria:write-string-into-file private-pem-str private-pem-path)
+        (alexandria:write-string-into-file public-pem-str  public-pem-path)
+        (init-keys)))))
 
 
 
